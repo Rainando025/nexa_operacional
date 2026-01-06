@@ -81,8 +81,8 @@ export default function Auth() {
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-blue-900/20 via-slate-900 to-slate-950" />
 
         {/* Animated Orbs */}
-        <div className="absolute top-1/4 -left-20 w-80 h-80 bg-primary/20 rounded-full blur-[100px] animate-pulse" />
-        <div className="absolute bottom-1/4 -right-20 w-96 h-96 bg-blue-600/10 rounded-full blur-[120px] animate-pulse" style={{ animationDelay: '2s' }} />
+        <div className="absolute top-1/2 -translate-y-1/2 -left-32 w-64 h-64 bg-primary/20 rounded-full blur-[80px] animate-pulse" />
+        <div className="absolute top-1/2 -translate-y-1/2 -right-32 w-64 h-64 bg-blue-600/10 rounded-full blur-[80px] animate-pulse" style={{ animationDelay: '2s' }} />
 
         {/* Grid Pattern */}
         <div className="absolute inset-0 bg-[linear-gradient(to_right,#1e293b_1px,transparent_1px),linear-gradient(to_bottom,#1e293b_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_50%,#000_70%,transparent_100%)] opacity-20" />
@@ -93,7 +93,7 @@ export default function Auth() {
           <img
             src="https://raw.githubusercontent.com/Rainando025/nexa-assets/refs/heads/main/nexa_logo2.png"
             alt="NEXA Logo"
-            className="h-20 mb-6 mx-auto object-contain filter drop-shadow-[0_0_2px_#fff]"
+            className="h-20 mb-6 mx-auto object-contain"
           />
           <h1 className="text-4xl font-extrabold tracking-tight text-white mb-2">
             Gestão <span className="text-primary">Operacional</span>
