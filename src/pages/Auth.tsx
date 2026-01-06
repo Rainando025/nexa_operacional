@@ -74,12 +74,31 @@ export default function Auth() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background p-4">
-      <div className="w-full max-w-md">
-        <div className="text-center mb-2">
-          <img src="https://raw.githubusercontent.com/Rainando025/nexa-assets/refs/heads/main/nexa_logo2.png" alt="NEXA Logo" className="h-16 mb-4 mx-auto object-contain" />
-          <h1 className="text-3xl font-bold tracking-tight">Gestão Operacional</h1>
-          <p className="text-muted-foreground mt-2">
+    <div className="min-h-screen flex items-center justify-center bg-[#020617] p-4 relative overflow-hidden font-sans">
+      {/* Background Decor */}
+      <div className="absolute inset-0 z-0">
+        {/* Main Gradient */}
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-blue-900/20 via-slate-900 to-slate-950" />
+
+        {/* Animated Orbs */}
+        <div className="absolute top-1/4 -left-20 w-80 h-80 bg-primary/20 rounded-full blur-[100px] animate-pulse" />
+        <div className="absolute bottom-1/4 -right-20 w-96 h-96 bg-blue-600/10 rounded-full blur-[120px] animate-pulse" style={{ animationDelay: '2s' }} />
+
+        {/* Grid Pattern */}
+        <div className="absolute inset-0 bg-[linear-gradient(to_right,#1e293b_1px,transparent_1px),linear-gradient(to_bottom,#1e293b_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_50%,#000_70%,transparent_100%)] opacity-20" />
+      </div>
+
+      <div className="w-full max-w-md z-10 animate-in fade-in zoom-in duration-700">
+        <div className="text-center mb-8">
+          <img
+            src="https://raw.githubusercontent.com/Rainando025/nexa-assets/refs/heads/main/nexa_logo2.png"
+            alt="NEXA Logo"
+            className="h-20 mb-6 mx-auto object-contain drop-shadow-[0_0_15px_rgba(59,130,246,0.5)]"
+          />
+          <h1 className="text-4xl font-extrabold tracking-tight text-white mb-2">
+            NEXA <span className="text-primary">GESTÃO</span>
+          </h1>
+          <p className="text-blue-200/60 font-medium italic">
             o elo entre tempo e produtividade🕢
           </p>
         </div>
