@@ -46,15 +46,21 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
         <div className="flex h-16 items-center justify-between px-4 border-b border-sidebar-border">
           {!collapsed && (
             <div className="flex items-center gap-2">
-              <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center">
-                <Target className="h-5 w-5 text-primary-foreground" />
-              </div>
-              <span className="font-bold text-lg">Inforbarra Telecom</span>
+              <img
+                src="https://raw.githubusercontent.com/Rainando025/nexa-assets/refs/heads/main/logoinfor.png"
+                alt="Inforbarra Logo"
+                className="h-8 w-8 object-contain rounded-lg bg-white/10 p-1"
+              />
+              <span className="font-bold text-lg whitespace-nowrap">Inforbarra Telecom</span>
             </div>
           )}
           {collapsed && (
-            <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center mx-auto">
-              <Target className="h-5 w-5 text-primary-foreground" />
+            <div className="flex items-center justify-center w-full">
+              <img
+                src="https://raw.githubusercontent.com/Rainando025/nexa-assets/refs/heads/main/logoinfor.png"
+                alt="Inforbarra Logo"
+                className="h-8 w-8 object-contain rounded-lg bg-white/10 p-1"
+              />
             </div>
           )}
         </div>
