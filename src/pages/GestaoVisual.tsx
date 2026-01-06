@@ -227,6 +227,7 @@ export default function GestaoVisual() {
   const [paretoData, setParetoData] = useState<ParetoItem[]>(initialPareto);
   const [nodes, setNodes] = useState<FlowNode[]>([]);
   const [edges, setEdges] = useState<FlowEdge[]>([]);
+  const [zoom, setZoom] = useState(1);
 
   // Dialog states
   const [newKanbanItem, setNewKanbanItem] = useState<{ title: string; description: string; priority: "low" | "medium" | "high"; columnId: string }>({ title: "", description: "", priority: "medium", columnId: "backlog" });
@@ -766,7 +767,10 @@ export default function GestaoVisual() {
                     <div
                       key={item.id}
                       className={cn(
-                        "stat-card p-3 hover:shadow-lg transition-all group",
+                        "stat-card p-3 hover:shadow-lg transition-all group border-l-4",
+                        item.priority === "high" && "border-l-destructive",
+                        item.priority === "medium" && "border-l-warning",
+                        item.priority === "low" && "border-l-primary",
                         editingKanban === item.id && "cursor-default"
                       )}
                     >
@@ -883,10 +887,10 @@ export default function GestaoVisual() {
 
         {/* GUT Matrix */}
         <TabsContent value="gut" className="space-y-4">
-          <div className="grid gap-6 lg:grid-cols-2">
+          <div className="grid gap-6 xl:grid-cols-2">
             {/* Tabela GUT */}
-            <div className="stat-card p-0 overflow-hidden">
-              <table className="w-full">
+            <div className="stat-card p-0 overflow-x-auto">
+              <table className="w-full min-w-[600px]">
                 <thead className="bg-secondary/50">
                   <tr>
                     <th className="text-left p-4 font-medium">Problema</th>
@@ -1528,9 +1532,9 @@ export default function GestaoVisual() {
             </div>
           </div>
 
-          <div className="grid gap-6 lg:grid-cols-2">
-            <div className="stat-card p-0 overflow-hidden">
-              <table className="w-full">
+          <div className="grid gap-6 xl:grid-cols-2">
+            <div className="stat-card p-0 overflow-x-auto">
+              <table className="w-full min-w-[500px]">
                 <thead className="bg-secondary/50">
                   <tr>
                     <th className="text-left p-4 font-medium">Causa</th>
@@ -1698,132 +1702,153 @@ export default function GestaoVisual() {
                 <ul className="text-[10px] text-muted-foreground space-y-1 list-disc pl-3">
                   <li>Arraste os blocos para posicionar</li>
                   <li>Clique no texto para editar</li>
-                  <li>Use o ícone <Link className="h-2 w-2 inline" /> para conectar</li>
+                  <li>Use o mouse wheel para dar zoom</li>
                 </ul>
               </div>
             </div>
 
             {/* Canvas Area */}
-            <div className="flex-1 min-h-[600px] bg-secondary/10 rounded-xl relative overflow-hidden border border-border/50 shadow-inner group"
-              style={{
-                backgroundImage: 'radial-gradient(circle, #333 1px, transparent 1px)',
-                backgroundSize: '20px 20px'
+            <div
+              className="flex-1 min-h-[700px] bg-white rounded-xl relative overflow-hidden border border-border shadow-lg group select-none"
+              onWheel={(e) => {
+                // Check if mouse is over canvas
+                const delta = e.deltaY > 0 ? -0.1 : 0.1;
+                setZoom(prev => Math.min(Math.max(0.3, prev + delta), 2));
               }}
             >
-              {/* SVG for Connections */}
-              <svg className="absolute inset-0 pointer-events-none w-full h-full">
-                <defs>
-                  <marker
-                    id="arrowhead"
-                    markerWidth="10"
-                    markerHeight="7"
-                    refX="9"
-                    refY="3.5"
-                    orient="auto"
+              {/* Zoom Controls Overlay */}
+              <div className="absolute bottom-4 right-4 z-50 flex items-center gap-2 bg-secondary/80 backdrop-blur-sm p-2 rounded-lg border border-border pointer-events-auto">
+                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setZoom(Math.max(0.3, zoom - 0.1))}>-</Button>
+                <span className="text-xs font-mono w-12 text-center">{Math.round(zoom * 100)}%</span>
+                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setZoom(Math.min(2, zoom + 0.1))}>+</Button>
+                <Button variant="ghost" size="sm" onClick={() => setZoom(1)}>Reset</Button>
+              </div>
+
+              {/* Scalable Content */}
+              <div
+                className="absolute inset-0 transition-transform duration-75 origin-top-left"
+                style={{ transform: `scale(${zoom})`, width: '5000px', height: '5000px' }}
+              >
+                {/* SVG for Connections */}
+                <svg className="absolute inset-0 pointer-events-none w-full h-full">
+                  <defs>
+                    <marker
+                      id="arrowhead"
+                      markerWidth="10"
+                      markerHeight="7"
+                      refX="9"
+                      refY="3.5"
+                      orient="auto"
+                    >
+                      <polygon points="0 0, 10 3.5, 0 7" fill="#64748b" />
+                    </marker>
+                  </defs>
+                  {edges.map((edge) => {
+                    const source = nodes.find(n => n.id === edge.sourceId);
+                    const target = nodes.find(n => n.id === edge.targetId);
+                    if (!source || !target) return null;
+
+                    // Calculate center coordinates
+                    const sx = source.x + 80;
+                    const sy = source.y + 30;
+                    const tx = target.x + 80;
+                    const ty = target.y + 30;
+
+                    return (
+                      <g key={edge.id}>
+                        <path
+                          d={`M ${sx} ${sy} C ${sx} ${sy + 50}, ${tx} ${ty - 50}, ${tx} ${ty}`}
+                          fill="none"
+                          stroke="#64748b"
+                          strokeWidth="2"
+                          markerEnd="url(#arrowhead)"
+                        />
+                        <circle cx={sx} cy={sy} r="3" fill="#64748b" />
+                      </g>
+                    );
+                  })}
+                </svg>
+
+                {/* Nodes */}
+                {nodes.map((node) => (
+                  <div
+                    key={node.id}
+                    className={cn(
+                      "absolute w-40 h-20 flex items-center justify-center p-4 text-center text-[11px] font-medium border shadow-md cursor-move transition-shadow active:shadow-xl z-10",
+                      node.type === "process" && "bg-blue-50/90 border-blue-200 rounded-md",
+                      node.type === "decision" && "bg-yellow-50/90 border-yellow-200",
+                      node.type === "start" && "bg-green-50/90 border-green-200 rounded-full h-14",
+                      node.type === "document" && "bg-orange-50/90 border-orange-200 rounded-none rounded-br-2xl"
+                    )}
+                    style={{
+                      left: node.x,
+                      top: node.y,
+                      clipPath: node.type === "decision" ? "polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%)" : undefined,
+                    }}
+                    onMouseDown={(e) => {
+                      const startX = e.clientX / zoom - node.x;
+                      const startY = e.clientY / zoom - node.y;
+
+                      const onMouseMove = (moveEvent: MouseEvent) => {
+                        const newX = Math.round((moveEvent.clientX / zoom - startX) / 10) * 10;
+                        const newY = Math.round((moveEvent.clientY / zoom - startY) / 10) * 10;
+                        setNodes(prev => prev.map(n => n.id === node.id ? { ...n, x: newX, y: newY } : n));
+                      };
+
+                      const onMouseUp = () => {
+                        document.removeEventListener('mousemove', onMouseMove);
+                        document.removeEventListener('mouseup', onMouseUp);
+                      };
+
+                      document.addEventListener('mousemove', onMouseMove);
+                      document.addEventListener('mouseup', onMouseUp);
+                    }}
                   >
-                    <polygon points="0 0, 10 3.5, 0 7" fill="#64748b" />
-                  </marker>
-                </defs>
-                {edges.map((edge) => {
-                  const source = nodes.find(n => n.id === edge.sourceId);
-                  const target = nodes.find(n => n.id === edge.targetId);
-                  if (!source || !target) return null;
-
-                  // Calculate center coordinates
-                  const sx = source.x + 80;
-                  const sy = source.y + 25;
-                  const tx = target.x + 80;
-                  const ty = target.y + 25;
-
-                  return (
-                    <g key={edge.id}>
-                      <path
-                        d={`M ${sx} ${sy} C ${sx} ${sy + 50}, ${tx} ${ty - 50}, ${tx} ${ty}`}
-                        fill="none"
-                        stroke="#64748b"
-                        strokeWidth="2"
-                        markerEnd="url(#arrowhead)"
+                    <div className="relative w-full h-full flex items-center justify-center group/node">
+                      <textarea
+                        value={node.label}
+                        onChange={(e) => setNodes(prev => prev.map(n => n.id === node.id ? { ...n, label: e.target.value } : n))}
+                        className="bg-transparent border-none text-center outline-none w-full cursor-text resize-none text-[10px] leading-tight font-semibold py-1 px-2"
+                        rows={2}
                       />
-                      <circle cx={sx} cy={sy} r="3" fill="#64748b" />
-                    </g>
-                  );
-                })}
-              </svg>
 
-              {/* Nodes */}
-              {nodes.map((node) => (
-                <div
-                  key={node.id}
-                  style={{ left: node.x, top: node.y }}
-                  className={cn(
-                    "absolute w-40 h-14 flex items-center justify-center p-2 text-center text-[11px] font-medium border shadow-lg cursor-move transition-shadow active:shadow-2xl z-10",
-                    node.type === "process" && "bg-blue-500/20 border-blue-500/50 rounded-md",
-                    node.type === "decision" && "bg-yellow-500/20 border-yellow-500/50 rotate-45",
-                    node.type === "start" && "bg-green-500/20 border-green-500/50 rounded-full",
-                    node.type === "document" && "bg-orange-500/20 border-orange-500/50 rounded-none rounded-br-2xl"
-                  )}
-                  onMouseDown={(e) => {
-                    const startX = e.clientX - node.x;
-                    const startY = e.clientY - node.y;
+                      {/* Connection Handles */}
+                      <div className="absolute -right-4 top-1/2 -translate-y-1/2 opacity-0 group-hover/node:opacity-100 transition-opacity flex flex-col gap-1">
+                        <Button
+                          variant="secondary"
+                          size="icon"
+                          className="h-6 w-6 rounded-full bg-slate-800/90 hover:bg-primary border border-white/20 shadow-md"
+                          title="Conectar"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const sourceId = (window as any).pendingEdgeSource;
+                            if (sourceId && sourceId !== node.id) {
+                              setEdges([...edges, { id: `edge-${Date.now()}`, sourceId, targetId: node.id }]);
+                              (window as any).pendingEdgeSource = null;
+                            } else {
+                              (window as any).pendingEdgeSource = node.id;
+                              toast({ title: "Início da conexão", description: "Selecione o próximo bloco para conectar." });
+                            }
+                          }}
+                        >
+                          <Link className="h-3 w-3 text-white" />
+                        </Button>
+                      </div>
 
-                    const onMouseMove = (moveEvent: MouseEvent) => {
-                      const newX = Math.round((moveEvent.clientX - startX) / 20) * 20; // grid snapping
-                      const newY = Math.round((moveEvent.clientY - startY) / 20) * 20;
-                      setNodes(prev => prev.map(n => n.id === node.id ? { ...n, x: newX, y: newY } : n));
-                    };
-
-                    const onMouseUp = () => {
-                      document.removeEventListener('mousemove', onMouseMove);
-                      document.removeEventListener('mouseup', onMouseUp);
-                    };
-
-                    document.addEventListener('mousemove', onMouseMove);
-                    document.addEventListener('mouseup', onMouseUp);
-                  }}
-                >
-                  <div className={cn("relative w-full h-full flex items-center justify-center", node.type === "decision" && "-rotate-45")}>
-                    <input
-                      value={node.label}
-                      onChange={(e) => setNodes(prev => prev.map(n => n.id === node.id ? { ...n, label: e.target.value } : n))}
-                      className="bg-transparent border-none text-center outline-none w-full cursor-text"
-                    />
-
-                    {/* Connection Handles */}
-                    <div className="absolute -right-1 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <Button
-                        variant="secondary"
-                        size="icon"
-                        className="h-4 w-4 rounded-full bg-slate-700 hover:bg-primary"
+                      <button
+                        className="absolute -top-4 -right-4 h-6 w-6 bg-destructive/90 text-white rounded-full items-center justify-center flex opacity-0 group-hover/node:opacity-100 transition-opacity shadow-md hover:bg-destructive"
                         onClick={(e) => {
                           e.stopPropagation();
-                          // Simplified connecting logic: click one node then another
-                          const sourceId = (window as any).pendingEdgeSource;
-                          if (sourceId && sourceId !== node.id) {
-                            setEdges([...edges, { id: `edge-${Date.now()}`, sourceId, targetId: node.id }]);
-                            (window as any).pendingEdgeSource = null;
-                          } else {
-                            (window as any).pendingEdgeSource = node.id;
-                            toast({ title: "Início da conexão", description: "Selecione o próximo bloco para conectar." });
-                          }
+                          setNodes(prev => prev.filter(n => n.id !== node.id));
+                          setEdges(prev => prev.filter(edge => edge.sourceId !== node.id && edge.targetId !== node.id));
                         }}
                       >
-                        <Link className="h-2 w-2 text-white" />
-                      </Button>
+                        <X className="h-4 w-4" />
+                      </button>
                     </div>
-
-                    <button
-                      className="absolute -top-1 -right-1 h-3 w-3 bg-destructive rounded-full items-center justify-center flex opacity-0 group-hover/node:opacity-100 transition-opacity"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setNodes(prev => prev.filter(n => n.id !== node.id));
-                        setEdges(prev => prev.filter(edge => edge.sourceId !== node.id && edge.targetId !== node.id));
-                      }}
-                    >
-                      <X className="h-2 w-2 text-white" />
-                    </button>
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
           </div>
         </TabsContent>
