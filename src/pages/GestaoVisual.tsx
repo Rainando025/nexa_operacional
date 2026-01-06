@@ -127,38 +127,26 @@ interface FlowEdge {
 // Initial data
 const initialKanban: KanbanColumn[] = [
   {
-    id: "backlog",
-    title: "Backlog",
-    items: [
-      { id: "k1", title: "Revisar processo de compras", description: "Análise completa do fluxo atual", priority: "medium" },
-      { id: "k2", title: "Treinar equipe em 5S", description: "Capacitação para nova metodologia", priority: "high" },
-    ],
-  },
-  {
     id: "todo",
     title: "A Fazer",
     items: [
+      { id: "k1", title: "Revisar processo de compras", description: "Análise completa do fluxo atual", priority: "medium" },
+      { id: "k2", title: "Treinar equipe em 5S", description: "Capacitação para nova metodologia", priority: "high" },
       { id: "k3", title: "Mapear desperdícios", description: "Identificar gargalos na produção", priority: "high" },
     ],
   },
   {
     id: "doing",
-    title: "Em Progresso",
+    title: "Fazendo",
     items: [
       { id: "k4", title: "Implementar Kanban físico", description: "Instalar quadros na fábrica", priority: "medium", assignee: "João" },
     ],
   },
   {
-    id: "review",
-    title: "Em Revisão",
+    id: "done",
+    title: "Feito",
     items: [
       { id: "k5", title: "Atualizar procedimentos", description: "Documentar novos processos", priority: "low" },
-    ],
-  },
-  {
-    id: "done",
-    title: "Concluído",
-    items: [
       { id: "k6", title: "Análise de indicadores", description: "Relatório mensal completo", priority: "low" },
     ],
   },
@@ -756,7 +744,12 @@ export default function GestaoVisual() {
             {kanbanData.map((column) => (
               <div
                 key={column.id}
-                className="flex-shrink-0 w-72 bg-secondary/30 rounded-lg p-4 space-y-3"
+                className={cn(
+                  "flex-shrink-0 w-72 bg-secondary/30 rounded-lg p-4 space-y-3 border-t-4",
+                  column.id === "todo" && "border-t-gray-400",
+                  column.id === "doing" && "border-t-orange-500",
+                  column.id === "done" && "border-t-green-500"
+                )}
               >
                 <div className="flex items-center justify-between">
                   <h3 className="font-semibold">{column.title}</h3>

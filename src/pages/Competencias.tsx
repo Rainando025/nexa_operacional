@@ -78,11 +78,11 @@ const initialEmployees = [
 ];
 
 const levelColors = {
-  1: "bg-destructive/20 text-destructive",
-  2: "bg-warning/20 text-warning",
-  3: "bg-info/20 text-info",
-  4: "bg-success/20 text-success",
-  5: "bg-primary/20 text-primary",
+  1: "bg-blue-50 text-blue-600 border border-blue-100",
+  2: "bg-blue-100 text-blue-700 border border-blue-200",
+  3: "bg-blue-300 text-blue-900 border border-blue-400",
+  4: "bg-blue-500 text-white border border-blue-600",
+  5: "bg-blue-700 text-white border border-blue-800",
 };
 
 const levelLabels = {
