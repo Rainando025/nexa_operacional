@@ -64,6 +64,18 @@ This project is built with:
 
 Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
 
+### Deployment on Vercel
+
+If you prefer to deploy on Vercel:
+
+1. Connect your GitHub repository to Vercel.
+2. Ensure you add the following Environment Variables in the Vercel dashboard:
+   - `VITE_SUPABASE_PROJECT_ID`
+   - `VITE_SUPABASE_PUBLISHABLE_KEY`
+   - `VITE_SUPABASE_URL`
+3. Vercel will automatically detect the Vite project and use `npm run build` to deploy.
+4. The included `vercel.json` ensures that all routes redirect to `index.html` for smooth navigation.
+
 ## Can I connect a custom domain to my Lovable project?
 
 Yes, you can!
