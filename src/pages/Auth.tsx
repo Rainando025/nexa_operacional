@@ -93,10 +93,10 @@ export default function Auth() {
           <img
             src="https://raw.githubusercontent.com/Rainando025/nexa-assets/refs/heads/main/nexa_logo2.png"
             alt="NEXA Logo"
-            className="h-20 mb-6 mx-auto object-contain drop-shadow-[0_0_15px_rgba(59,130,246,0.5)]"
+            className="h-20 mb-6 mx-auto object-contain filter drop-shadow-[0_0_2px_#fff]"
           />
           <h1 className="text-4xl font-extrabold tracking-tight text-white mb-2">
-            NEXA <span className="text-primary">GESTÃO</span>
+            Gestão <span className="text-primary">Operacional</span>
           </h1>
           <p className="text-blue-200/60 font-medium italic">
             o elo entre tempo e produtividade🕢
