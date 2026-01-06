@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -64,8 +64,18 @@ export function OKRModal({
 
   const form = useForm<OKRFormData>({
     resolver: zodResolver(okrSchema),
-    defaultValues: initialData
-      ? {
+    defaultValues: {
+      objective: "",
+      owner: "",
+      quarter: "Q1 2024",
+      keyResults: [{ title: "", current: 0, target: 100, unit: "%" }],
+    },
+  });
+
+  useEffect(() => {
+    if (open) {
+      if (initialData) {
+        form.reset({
           objective: initialData.objective,
           owner: initialData.owner,
           quarter: initialData.quarter,
@@ -75,14 +85,17 @@ export function OKRModal({
             target: kr.target,
             unit: kr.unit,
           })),
-        }
-      : {
+        });
+      } else {
+        form.reset({
           objective: "",
           owner: "",
           quarter: "Q1 2024",
           keyResults: [{ title: "", current: 0, target: 100, unit: "%" }],
-        },
-  });
+        });
+      }
+    }
+  }, [open, initialData, form]);
 
   const { fields, append, remove } = useFieldArray({
     control: form.control,

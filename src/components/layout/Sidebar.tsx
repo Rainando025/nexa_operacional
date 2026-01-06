@@ -23,7 +23,7 @@ const navItems = [
   { path: "/okrs", icon: Crosshair, label: "OKRs" },
   { path: "/processos", icon: GitBranch, label: "Processos" },
   { path: "/gestao-visual", icon: LayoutGrid, label: "Gestão Visual" },
-  { path: "/matrizes", icon: Grid3X3, label: "Matrizes" },
+  { path: "/competencias", icon: Grid3X3, label: "Competências" },
 ];
 
 interface SidebarProps {

@@ -14,6 +14,12 @@ import {
   Edit,
   Check,
   X,
+  Share2,
+  Box,
+  MousePointer2,
+  Type,
+  Link,
+  Zap,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -35,6 +41,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
+import { toast } from "@/hooks/use-toast";
 import {
   BarChart,
   Bar,
@@ -100,6 +107,21 @@ interface ParetoItem {
   frequency: number;
   percentage?: number;
   cumulative?: number;
+}
+
+interface FlowNode {
+  id: string;
+  type: "process" | "decision" | "start" | "end" | "document";
+  label: string;
+  x: number;
+  y: number;
+}
+
+interface FlowEdge {
+  id: string;
+  sourceId: string;
+  targetId: string;
+  label?: string;
 }
 
 // Initial data
@@ -203,7 +225,9 @@ export default function GestaoVisual() {
   const [eisenhowerData, setEisenhowerData] = useState<EisenhowerItem[]>(initialEisenhower);
   const [w5h2Data, setW5H2Data] = useState<W5H2Item[]>(initialW5H2);
   const [paretoData, setParetoData] = useState<ParetoItem[]>(initialPareto);
-  
+  const [nodes, setNodes] = useState<FlowNode[]>([]);
+  const [edges, setEdges] = useState<FlowEdge[]>([]);
+
   // Dialog states
   const [newKanbanItem, setNewKanbanItem] = useState<{ title: string; description: string; priority: "low" | "medium" | "high"; columnId: string }>({ title: "", description: "", priority: "medium", columnId: "backlog" });
   const [newGutItem, setNewGutItem] = useState({ problem: "", gravity: 3, urgency: 3, trend: 3 });
@@ -360,11 +384,11 @@ export default function GestaoVisual() {
       prev.map((col) =>
         col.id === columnId
           ? {
-              ...col,
-              items: col.items.map((item) =>
-                item.id === itemId ? { ...item, [field]: value } : item
-              ),
-            }
+            ...col,
+            items: col.items.map((item) =>
+              item.id === itemId ? { ...item, [field]: value } : item
+            ),
+          }
           : col
       )
     );
@@ -718,22 +742,26 @@ export default function GestaoVisual() {
             <BarChart3 className="h-4 w-4" />
             <span className="hidden sm:inline">Pareto</span>
           </TabsTrigger>
+          <TabsTrigger value="fluxograma" className="gap-2">
+            <Share2 className="h-4 w-4" />
+            <span className="hidden sm:inline">Fluxograma</span>
+          </TabsTrigger>
         </TabsList>
 
         {/* Kanban */}
-          <TabsContent value="kanban" className="space-y-4">
-            <p className="text-sm text-muted-foreground">Edite o card e selecione o status (coluna)</p>
-            <div className="flex gap-4 overflow-x-auto pb-4">
-              {kanbanData.map((column) => (
-                <div
-                  key={column.id}
-                  className="flex-shrink-0 w-72 bg-secondary/30 rounded-lg p-4 space-y-3"
-                >
-                  <div className="flex items-center justify-between">
-                    <h3 className="font-semibold">{column.title}</h3>
-                    <Badge variant="secondary">{column.items.length}</Badge>
-                  </div>
-                  <div className="space-y-2 min-h-[200px]">
+        <TabsContent value="kanban" className="space-y-4">
+          <p className="text-sm text-muted-foreground">Edite o card e selecione o status (coluna)</p>
+          <div className="flex gap-4 overflow-x-auto pb-4">
+            {kanbanData.map((column) => (
+              <div
+                key={column.id}
+                className="flex-shrink-0 w-72 bg-secondary/30 rounded-lg p-4 space-y-3"
+              >
+                <div className="flex items-center justify-between">
+                  <h3 className="font-semibold">{column.title}</h3>
+                  <Badge variant="secondary">{column.items.length}</Badge>
+                </div>
+                <div className="space-y-2 min-h-[200px]">
                   {column.items.map((item) => (
                     <div
                       key={item.id}
@@ -942,8 +970,8 @@ export default function GestaoVisual() {
                         <Badge
                           className={cn(
                             item.score >= 80 ? "bg-destructive/10 text-destructive" :
-                            item.score >= 40 ? "bg-warning/10 text-warning" :
-                            "bg-success/10 text-success"
+                              item.score >= 40 ? "bg-warning/10 text-warning" :
+                                "bg-success/10 text-success"
                           )}
                         >
                           {item.score}
@@ -989,26 +1017,26 @@ export default function GestaoVisual() {
                     Tendência: item.trend,
                   }))}>
                     <PolarGrid stroke="hsl(var(--border))" />
-                    <PolarAngleAxis 
-                      dataKey="problem" 
+                    <PolarAngleAxis
+                      dataKey="problem"
                       tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 10 }}
                     />
-                    <PolarRadiusAxis 
-                      angle={30} 
-                      domain={[0, 5]} 
+                    <PolarRadiusAxis
+                      angle={30}
+                      domain={[0, 5]}
                       tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 10 }}
                     />
                     <Radar name="Gravidade" dataKey="Gravidade" stroke="hsl(var(--destructive))" fill="hsl(var(--destructive))" fillOpacity={0.3} />
                     <Radar name="Urgência" dataKey="Urgência" stroke="hsl(var(--warning))" fill="hsl(var(--warning))" fillOpacity={0.3} />
                     <Radar name="Tendência" dataKey="Tendência" stroke="hsl(var(--primary))" fill="hsl(var(--primary))" fillOpacity={0.3} />
                     <Legend wrapperStyle={{ fontSize: '12px' }} />
-                    <Tooltip 
-                      contentStyle={{ 
-                        backgroundColor: 'hsl(var(--card))', 
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: 'hsl(var(--card))',
                         border: '1px solid hsl(var(--border))',
                         borderRadius: '8px',
                         fontSize: '12px'
-                      }} 
+                      }}
                     />
                   </RadarChart>
                 </ResponsiveContainer>
@@ -1027,23 +1055,23 @@ export default function GestaoVisual() {
                   fill: item.score >= 80 ? 'hsl(var(--destructive))' : item.score >= 40 ? 'hsl(var(--warning))' : 'hsl(var(--success))'
                 }))}>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                  <XAxis 
-                    dataKey="name" 
+                  <XAxis
+                    dataKey="name"
                     tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 10 }}
                     angle={-15}
                     textAnchor="end"
                     height={60}
                   />
-                  <YAxis 
+                  <YAxis
                     tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 10 }}
                     domain={[0, 125]}
                   />
-                  <Tooltip 
-                    contentStyle={{ 
-                      backgroundColor: 'hsl(var(--card))', 
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: 'hsl(var(--card))',
                       border: '1px solid hsl(var(--border))',
                       borderRadius: '8px'
-                    }} 
+                    }}
                   />
                   <Bar dataKey="score" radius={[4, 4, 0, 0]}>
                   </Bar>
@@ -1430,28 +1458,28 @@ export default function GestaoVisual() {
               <ResponsiveContainer width="100%" height="100%">
                 <ComposedChart data={paretoWithCalcs}>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                  <XAxis 
-                    dataKey="cause" 
+                  <XAxis
+                    dataKey="cause"
                     tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }}
                     angle={-20}
                     textAnchor="end"
                     height={70}
                   />
-                  <YAxis 
+                  <YAxis
                     yAxisId="left"
                     tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }}
                     label={{ value: 'Frequência', angle: -90, position: 'insideLeft', fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
                   />
-                  <YAxis 
-                    yAxisId="right" 
-                    orientation="right" 
+                  <YAxis
+                    yAxisId="right"
+                    orientation="right"
                     domain={[0, 100]}
                     tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }}
                     label={{ value: '% Acumulado', angle: 90, position: 'insideRight', fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
                   />
-                  <Tooltip 
-                    contentStyle={{ 
-                      backgroundColor: 'hsl(var(--card))', 
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: 'hsl(var(--card))',
                       border: '1px solid hsl(var(--border))',
                       borderRadius: '8px'
                     }}
@@ -1460,22 +1488,22 @@ export default function GestaoVisual() {
                       name === 'frequency' ? 'Frequência' : '% Acumulado'
                     ]}
                   />
-                  <Legend 
+                  <Legend
                     wrapperStyle={{ fontSize: '12px' }}
                     formatter={(value) => value === 'frequency' ? 'Frequência' : '% Acumulado'}
                   />
-                  <Bar 
-                    yAxisId="left" 
-                    dataKey="frequency" 
-                    fill="hsl(var(--primary))" 
+                  <Bar
+                    yAxisId="left"
+                    dataKey="frequency"
+                    fill="hsl(var(--primary))"
                     radius={[4, 4, 0, 0]}
                     name="frequency"
                   />
-                  <Line 
-                    yAxisId="right" 
-                    type="monotone" 
-                    dataKey="cumulative" 
-                    stroke="hsl(var(--destructive))" 
+                  <Line
+                    yAxisId="right"
+                    type="monotone"
+                    dataKey="cumulative"
+                    stroke="hsl(var(--destructive))"
                     strokeWidth={3}
                     dot={{ fill: 'hsl(var(--destructive))', strokeWidth: 2, r: 5 }}
                     name="cumulative"
@@ -1533,7 +1561,7 @@ export default function GestaoVisual() {
                             onBlur={() => setEditingPareto(null)}
                           />
                         ) : (
-                          <span 
+                          <span
                             className="cursor-pointer hover:text-primary"
                             onClick={() => setEditingPareto(item.id)}
                           >
@@ -1608,6 +1636,194 @@ export default function GestaoVisual() {
                   </p>
                 </div>
               </div>
+            </div>
+          </div>
+        </TabsContent>
+        {/* Fluxograma */}
+        <TabsContent value="fluxograma" className="space-y-6">
+          <div className="flex flex-col sm:flex-row gap-4">
+            {/* Toolbar */}
+            <div className="w-full sm:w-48 bg-secondary/30 rounded-xl p-4 space-y-4 border border-border/50">
+              <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Ferramentas</p>
+
+              <div className="grid grid-cols-2 sm:grid-cols-1 gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="justify-start gap-2 h-9 text-xs"
+                  onClick={() => {
+                    const id = `node-${Date.now()}`;
+                    setNodes([...nodes, { id, type: "process", label: "Novo Processo", x: 50, y: 50 }]);
+                  }}
+                >
+                  <Box className="h-4 w-4 text-blue-400" /> Processo
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="justify-start gap-2 h-9 text-xs"
+                  onClick={() => {
+                    const id = `node-${Date.now()}`;
+                    setNodes([...nodes, { id, type: "decision", label: "Decisão?", x: 100, y: 100 }]);
+                  }}
+                >
+                  <Zap className="h-4 w-4 text-yellow-400" /> Decisão
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="justify-start gap-2 h-9 text-xs"
+                  onClick={() => {
+                    const id = `node-${Date.now()}`;
+                    setNodes([...nodes, { id, type: "start", label: "Início", x: 20, y: 20 }]);
+                  }}
+                >
+                  <Circle className="h-4 w-4 text-green-400" /> Início/Fim
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="justify-start gap-2 h-9 text-xs"
+                  onClick={() => {
+                    const id = `node-${Date.now()}`;
+                    setNodes([...nodes, { id, type: "document", label: "Documento", x: 150, y: 150 }]);
+                  }}
+                >
+                  <FileText className="h-4 w-4 text-orange-400" /> Documento
+                </Button>
+              </div>
+
+              <div className="pt-4 border-t border-border/50">
+                <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider mb-2">Instruções</p>
+                <ul className="text-[10px] text-muted-foreground space-y-1 list-disc pl-3">
+                  <li>Arraste os blocos para posicionar</li>
+                  <li>Clique no texto para editar</li>
+                  <li>Use o ícone <Link className="h-2 w-2 inline" /> para conectar</li>
+                </ul>
+              </div>
+            </div>
+
+            {/* Canvas Area */}
+            <div className="flex-1 min-h-[600px] bg-secondary/10 rounded-xl relative overflow-hidden border border-border/50 shadow-inner group"
+              style={{
+                backgroundImage: 'radial-gradient(circle, #333 1px, transparent 1px)',
+                backgroundSize: '20px 20px'
+              }}
+            >
+              {/* SVG for Connections */}
+              <svg className="absolute inset-0 pointer-events-none w-full h-full">
+                <defs>
+                  <marker
+                    id="arrowhead"
+                    markerWidth="10"
+                    markerHeight="7"
+                    refX="9"
+                    refY="3.5"
+                    orient="auto"
+                  >
+                    <polygon points="0 0, 10 3.5, 0 7" fill="#64748b" />
+                  </marker>
+                </defs>
+                {edges.map((edge) => {
+                  const source = nodes.find(n => n.id === edge.sourceId);
+                  const target = nodes.find(n => n.id === edge.targetId);
+                  if (!source || !target) return null;
+
+                  // Calculate center coordinates
+                  const sx = source.x + 80;
+                  const sy = source.y + 25;
+                  const tx = target.x + 80;
+                  const ty = target.y + 25;
+
+                  return (
+                    <g key={edge.id}>
+                      <path
+                        d={`M ${sx} ${sy} C ${sx} ${sy + 50}, ${tx} ${ty - 50}, ${tx} ${ty}`}
+                        fill="none"
+                        stroke="#64748b"
+                        strokeWidth="2"
+                        markerEnd="url(#arrowhead)"
+                      />
+                      <circle cx={sx} cy={sy} r="3" fill="#64748b" />
+                    </g>
+                  );
+                })}
+              </svg>
+
+              {/* Nodes */}
+              {nodes.map((node) => (
+                <div
+                  key={node.id}
+                  style={{ left: node.x, top: node.y }}
+                  className={cn(
+                    "absolute w-40 h-14 flex items-center justify-center p-2 text-center text-[11px] font-medium border shadow-lg cursor-move transition-shadow active:shadow-2xl z-10",
+                    node.type === "process" && "bg-blue-500/20 border-blue-500/50 rounded-md",
+                    node.type === "decision" && "bg-yellow-500/20 border-yellow-500/50 rotate-45",
+                    node.type === "start" && "bg-green-500/20 border-green-500/50 rounded-full",
+                    node.type === "document" && "bg-orange-500/20 border-orange-500/50 rounded-none rounded-br-2xl"
+                  )}
+                  onMouseDown={(e) => {
+                    const startX = e.clientX - node.x;
+                    const startY = e.clientY - node.y;
+
+                    const onMouseMove = (moveEvent: MouseEvent) => {
+                      const newX = Math.round((moveEvent.clientX - startX) / 20) * 20; // grid snapping
+                      const newY = Math.round((moveEvent.clientY - startY) / 20) * 20;
+                      setNodes(prev => prev.map(n => n.id === node.id ? { ...n, x: newX, y: newY } : n));
+                    };
+
+                    const onMouseUp = () => {
+                      document.removeEventListener('mousemove', onMouseMove);
+                      document.removeEventListener('mouseup', onMouseUp);
+                    };
+
+                    document.addEventListener('mousemove', onMouseMove);
+                    document.addEventListener('mouseup', onMouseUp);
+                  }}
+                >
+                  <div className={cn("relative w-full h-full flex items-center justify-center", node.type === "decision" && "-rotate-45")}>
+                    <input
+                      value={node.label}
+                      onChange={(e) => setNodes(prev => prev.map(n => n.id === node.id ? { ...n, label: e.target.value } : n))}
+                      className="bg-transparent border-none text-center outline-none w-full cursor-text"
+                    />
+
+                    {/* Connection Handles */}
+                    <div className="absolute -right-1 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <Button
+                        variant="secondary"
+                        size="icon"
+                        className="h-4 w-4 rounded-full bg-slate-700 hover:bg-primary"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          // Simplified connecting logic: click one node then another
+                          const sourceId = (window as any).pendingEdgeSource;
+                          if (sourceId && sourceId !== node.id) {
+                            setEdges([...edges, { id: `edge-${Date.now()}`, sourceId, targetId: node.id }]);
+                            (window as any).pendingEdgeSource = null;
+                          } else {
+                            (window as any).pendingEdgeSource = node.id;
+                            toast({ title: "Início da conexão", description: "Selecione o próximo bloco para conectar." });
+                          }
+                        }}
+                      >
+                        <Link className="h-2 w-2 text-white" />
+                      </Button>
+                    </div>
+
+                    <button
+                      className="absolute -top-1 -right-1 h-3 w-3 bg-destructive rounded-full items-center justify-center flex opacity-0 group-hover/node:opacity-100 transition-opacity"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setNodes(prev => prev.filter(n => n.id !== node.id));
+                        setEdges(prev => prev.filter(edge => edge.sourceId !== node.id && edge.targetId !== node.id));
+                      }}
+                    >
+                      <X className="h-2 w-2 text-white" />
+                    </button>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         </TabsContent>

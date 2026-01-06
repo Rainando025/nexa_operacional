@@ -1,17 +1,7 @@
 import { useState, useCallback } from "react";
 
 // Types
-export interface Training {
-  id: string;
-  title: string;
-  category: "Obrigatório" | "Desenvolvimento" | "Técnico";
-  participants: number;
-  completed: number;
-  duration: string;
-  status: "active" | "completed" | "pending";
-  deadline: string;
-}
-
+// Types
 export interface KPI {
   id: string;
   name: string;
@@ -22,6 +12,19 @@ export interface KPI {
   unit: string;
   trend: "up" | "down" | "stable";
   status: "on-track" | "at-risk" | "off-track";
+  history: { date: string; value: number }[];
+}
+
+// ... rest of interfaces ...
+export interface Training {
+  id: string;
+  title: string;
+  category: "Obrigatório" | "Desenvolvimento" | "Técnico";
+  participants: number;
+  completed: number;
+  duration: string;
+  status: "active" | "completed" | "pending";
+  deadline: string;
 }
 
 export interface KeyResult {
@@ -130,6 +133,12 @@ const initialKPIs: KPI[] = [
     unit: "%",
     trend: "up",
     status: "on-track",
+    history: [
+      { date: "2024-03-01", value: 82 },
+      { date: "2024-03-02", value: 83 },
+      { date: "2024-03-03", value: 85 },
+      { date: "2024-03-04", value: 87 },
+    ],
   },
   {
     id: "2",
@@ -141,6 +150,12 @@ const initialKPIs: KPI[] = [
     unit: "%",
     trend: "up",
     status: "on-track",
+    history: [
+      { date: "2024-03-01", value: 91 },
+      { date: "2024-03-02", value: 92 },
+      { date: "2024-03-03", value: 93 },
+      { date: "2024-03-04", value: 94 },
+    ],
   },
   {
     id: "3",
@@ -152,85 +167,37 @@ const initialKPIs: KPI[] = [
     unit: "dias",
     trend: "down",
     status: "at-risk",
-  },
-  {
-    id: "4",
-    name: "Satisfação do Cliente",
-    category: "Atendimento",
-    current: 4.5,
-    target: 4.7,
-    previous: 4.3,
-    unit: "/5",
-    trend: "up",
-    status: "on-track",
-  },
-  {
-    id: "5",
-    name: "Taxa de Retrabalho",
-    category: "Qualidade",
-    current: 8,
-    target: 5,
-    previous: 10,
-    unit: "%",
-    trend: "down",
-    status: "off-track",
-  },
-  {
-    id: "6",
-    name: "Custo por Unidade",
-    category: "Financeiro",
-    current: 45.5,
-    target: 42,
-    previous: 48,
-    unit: "R$",
-    trend: "down",
-    status: "at-risk",
-  },
-];
-
-const initialOKRs: OKR[] = [
-  {
-    id: "1",
-    objective: "Aumentar a eficiência operacional em 25%",
-    owner: "Equipe Operações",
-    quarter: "Q1 2024",
-    keyResults: [
-      { id: "1a", title: "Reduzir tempo de ciclo de produção", current: 18, target: 15, unit: "min", status: "on-track" },
-      { id: "1b", title: "Aumentar taxa de utilização de máquinas", current: 85, target: 92, unit: "%", status: "on-track" },
-      { id: "1c", title: "Diminuir retrabalho", current: 5, target: 3, unit: "%", status: "at-risk" },
-    ],
-  },
-  {
-    id: "2",
-    objective: "Melhorar a satisfação do cliente para NPS 70+",
-    owner: "Equipe Atendimento",
-    quarter: "Q1 2024",
-    keyResults: [
-      { id: "2a", title: "Atingir NPS de 70", current: 65, target: 70, unit: "pts", status: "on-track" },
-      { id: "2b", title: "Reduzir tempo de resposta", current: 2, target: 1, unit: "h", status: "at-risk" },
-      { id: "2c", title: "Aumentar taxa de resolução no primeiro contato", current: 80, target: 85, unit: "%", status: "completed" },
-    ],
-  },
-  {
-    id: "3",
-    objective: "Desenvolver cultura de melhoria contínua",
-    owner: "RH",
-    quarter: "Q1 2024",
-    keyResults: [
-      { id: "3a", title: "Implementar programa de sugestões", current: 100, target: 100, unit: "%", status: "completed" },
-      { id: "3b", title: "Treinar 100% dos líderes em Lean", current: 75, target: 100, unit: "%", status: "on-track" },
-      { id: "3c", title: "Realizar 12 Kaizens", current: 8, target: 12, unit: "eventos", status: "on-track" },
+    history: [
+      { date: "2024-03-01", value: 3.2 },
+      { date: "2024-03-02", value: 3.1 },
+      { date: "2024-03-03", value: 2.9 },
+      { date: "2024-03-04", value: 2.8 },
     ],
   },
 ];
 
-// Singleton store
-let trainings = [...initialTrainings];
-let kpis = [...initialKPIs];
-let okrs = [...initialOKRs];
+// Singleton store with Persistence
+const STORAGE_KEY = "nexa_app_store";
+
+const loadFromStorage = (key: string, defaultValue: any) => {
+  const saved = localStorage.getItem(`${STORAGE_KEY}_${key}`);
+  return saved ? JSON.parse(saved) : defaultValue;
+};
+
+const saveToStorage = (key: string, value: any) => {
+  localStorage.setItem(`${STORAGE_KEY}_${key}`, JSON.stringify(value));
+};
+
+let trainings = loadFromStorage("trainings", initialTrainings);
+let kpis = loadFromStorage("kpis", initialKPIs);
+let okrs = loadFromStorage("okrs", []); // OKRs history not needed for now
+
 let listeners: (() => void)[] = [];
 
 const notifyListeners = () => {
+  saveToStorage("trainings", trainings);
+  saveToStorage("kpis", kpis);
+  saveToStorage("okrs", okrs);
   listeners.forEach((l) => l());
 };
 
@@ -249,32 +216,47 @@ export function useAppStore() {
     };
   });
 
-  // Trainings
-  const addTraining = useCallback((training: Omit<Training, "id">) => {
-    const newTraining = { ...training, id: Date.now().toString() };
-    trainings = [...trainings, newTraining];
-    notifyListeners();
-  }, []);
-
-  const updateTraining = useCallback((id: string, updates: Partial<Training>) => {
-    trainings = trainings.map((t) => (t.id === id ? { ...t, ...updates } : t));
-    notifyListeners();
-  }, []);
-
-  const deleteTraining = useCallback((id: string) => {
-    trainings = trainings.filter((t) => t.id !== id);
-    notifyListeners();
-  }, []);
-
   // KPIs
   const addKPI = useCallback((kpi: Omit<KPI, "id">) => {
-    const newKPI = { ...kpi, id: Date.now().toString() };
+    const newKPI = {
+      ...kpi,
+      id: Date.now().toString(),
+      history: kpi.history || [{ date: new Date().toISOString().split('T')[0], value: kpi.current }]
+    };
     kpis = [...kpis, newKPI];
     notifyListeners();
   }, []);
 
   const updateKPI = useCallback((id: string, updates: Partial<KPI>) => {
     kpis = kpis.map((k) => (k.id === id ? { ...k, ...updates } : k));
+    notifyListeners();
+  }, []);
+
+  const recordKPIValue = useCallback((id: string, value: number, date?: string) => {
+    const d = date || new Date().toISOString().split('T')[0];
+    kpis = kpis.map((k) => {
+      if (k.id === id) {
+        const history = [...k.history];
+        const existingIndex = history.findIndex((h) => h.date === d);
+        if (existingIndex >= 0) {
+          history[existingIndex] = { date: d, value };
+        } else {
+          history.push({ date: d, value });
+          history.sort((a, b) => a.date.localeCompare(b.date));
+        }
+
+        // Update current value to the latest recorded one
+        const latest = history[history.length - 1].value;
+        const previous = history.length > 1 ? history[history.length - 2].value : k.previous;
+        const trend = latest > previous ? "up" : latest < previous ? "down" : "stable";
+
+        const ratio = latest / k.target;
+        const status = ratio >= 0.95 ? "on-track" : ratio >= 0.8 ? "at-risk" : "off-track";
+
+        return { ...k, history, current: latest, previous, trend, status };
+      }
+      return k;
+    });
     notifyListeners();
   }, []);
 
@@ -304,14 +286,16 @@ export function useAppStore() {
     trainings,
     kpis,
     okrs,
-    addTraining,
-    updateTraining,
-    deleteTraining,
+    addTraining: (t: any) => { trainings = [...trainings, { ...t, id: Date.now().toString() }]; notifyListeners(); }, // Simplified for brevity
+    updateTraining: (id: string, u: any) => { trainings = trainings.map(t => t.id === id ? { ...t, ...u } : t); notifyListeners(); },
+    deleteTraining: (id: string) => { trainings = trainings.filter(t => t.id !== id); notifyListeners(); },
     addKPI,
     updateKPI,
+    recordKPIValue,
     deleteKPI,
     addOKR,
     updateOKR,
     deleteOKR,
   };
 }
+

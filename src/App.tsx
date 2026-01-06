@@ -13,7 +13,7 @@ import KPIs from "./pages/KPIs";
 import OKRs from "./pages/OKRs";
 import Processos from "./pages/Processos";
 import GestaoVisual from "./pages/GestaoVisual";
-import Matrizes from "./pages/Matrizes";
+import Competencias from "./pages/Competencias";
 import Agenda from "./pages/Agenda";
 import Mural from "./pages/Mural";
 import Configuracoes from "./pages/Configuracoes";
@@ -46,7 +46,7 @@ const App = () => (
                 <Route path="/okrs" element={<OKRs />} />
                 <Route path="/processos" element={<Processos />} />
                 <Route path="/gestao-visual" element={<GestaoVisual />} />
-                <Route path="/matrizes" element={<Matrizes />} />
+                <Route path="/competencias" element={<Competencias />} />
                 <Route path="/agenda" element={<Agenda />} />
                 <Route path="/mural" element={<Mural />} />
                 <Route path="/configuracoes" element={<AdminRoute><Configuracoes /></AdminRoute>} />

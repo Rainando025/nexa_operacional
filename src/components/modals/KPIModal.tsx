@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -65,22 +65,37 @@ export function KPIModal({
 
   const form = useForm<KPIFormData>({
     resolver: zodResolver(kpiSchema),
-    defaultValues: initialData
-      ? {
+    defaultValues: {
+      name: "",
+      category: "",
+      current: 0,
+      target: 0,
+      unit: "%",
+    },
+  });
+
+  useEffect(() => {
+    if (open) {
+      if (initialData) {
+        form.reset({
           name: initialData.name,
           category: initialData.category,
           current: initialData.current,
           target: initialData.target,
           unit: initialData.unit,
-        }
-      : {
+        });
+      } else {
+        form.reset({
           name: "",
           category: "",
           current: 0,
           target: 0,
           unit: "%",
-        },
-  });
+        });
+      }
+    }
+  }, [open, initialData, form]);
+
 
   const calculateStatus = (current: number, target: number): KPI["status"] => {
     const ratio = current / target;
@@ -105,6 +120,7 @@ export function KPIModal({
         previous,
         trend,
         status,
+        history: initialData?.history || [],
       };
       onSubmit(kpiData);
       toast({
