@@ -51,6 +51,7 @@ import { useAppStore, KPI } from "@/hooks/useAppStore";
 import { KPIModal } from "@/components/modals/KPIModal";
 import { LineChart, Line, ResponsiveContainer, XAxis, YAxis, Tooltip } from "recharts";
 import { toast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
 
 const statusConfig = {
   "on-track": { label: "No caminho", color: "bg-success/10 text-success" },
@@ -61,7 +62,8 @@ const statusConfig = {
 const categories = ["Todos", "Operacional", "Qualidade", "Financeiro", "RH", "Logística", "Atendimento", "Manutenção"];
 
 export default function KPIs() {
-  const { kpis, addKPI, updateKPI, deleteKPI, recordKPIValue } = useAppStore();
+  const { kpis, addKPI, updateKPI, deleteKPI, recordKPIValue, addNotification } = useAppStore();
+  const { profile } = useAuth();
   const [selectedCategory, setSelectedCategory] = useState("Todos");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingKPI, setEditingKPI] = useState<KPI | undefined>();
@@ -90,14 +92,33 @@ export default function KPIs() {
   const handleSubmit = (data: Omit<KPI, "id">) => {
     if (editingKPI) {
       updateKPI(editingKPI.id, data);
+      addNotification({
+        userName: profile?.name || "Usuário",
+        action: "EDITOU",
+        resource: "KPI",
+        details: `Editou as configurações do KPI: "${data.name}"`,
+      });
     } else {
       addKPI(data);
+      addNotification({
+        userName: profile?.name || "Usuário",
+        action: "CRIOU",
+        resource: "KPI",
+        details: `Criou um novo KPI: "${data.name}"`,
+      });
     }
   };
 
   const handleDelete = () => {
     if (deletingId) {
+      const kpiToDelete = kpis.find(k => k.id === deletingId);
       deleteKPI(deletingId);
+      addNotification({
+        userName: profile?.name || "Usuário",
+        action: "EXCLUIU",
+        resource: "KPI",
+        details: `Excluiu o KPI: "${kpiToDelete?.name || "Desconhecido"}"`,
+      });
       setDeletingId(null);
     }
   };
@@ -106,6 +127,12 @@ export default function KPIs() {
     e.preventDefault();
     if (selectedKPI && newValue) {
       recordKPIValue(selectedKPI.id, parseFloat(newValue));
+      addNotification({
+        userName: profile?.name || "Usuário",
+        action: "EDITOU",
+        resource: "KPI",
+        details: `Registrou novo valor (${newValue}${selectedKPI.unit}) para o KPI: "${selectedKPI.name}"`,
+      });
       toast({
         title: "Valor registrado!",
         description: `O valor de ${newValue}${selectedKPI.unit} foi registrado com sucesso.`,

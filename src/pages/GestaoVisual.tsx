@@ -42,6 +42,8 @@ import {
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { toast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
+import { useAppStore } from "@/hooks/useAppStore";
 import {
   BarChart,
   Bar,
@@ -65,7 +67,6 @@ interface KanbanItem {
   id: string;
   title: string;
   description: string;
-  priority: "low" | "medium" | "high";
   assignee?: string;
 }
 
@@ -130,24 +131,24 @@ const initialKanban: KanbanColumn[] = [
     id: "todo",
     title: "A Fazer",
     items: [
-      { id: "k1", title: "Revisar processo de compras", description: "Análise completa do fluxo atual", priority: "medium" },
-      { id: "k2", title: "Treinar equipe em 5S", description: "Capacitação para nova metodologia", priority: "high" },
-      { id: "k3", title: "Mapear desperdícios", description: "Identificar gargalos na produção", priority: "high" },
+      { id: "k1", title: "Revisar processo de compras", description: "Análise completa do fluxo atual" },
+      { id: "k2", title: "Treinar equipe em 5S", description: "Capacitação para nova metodologia" },
+      { id: "k3", title: "Mapear desperdícios", description: "Identificar gargalos na produção" },
     ],
   },
   {
     id: "doing",
     title: "Fazendo",
     items: [
-      { id: "k4", title: "Implementar Kanban físico", description: "Instalar quadros na fábrica", priority: "medium", assignee: "João" },
+      { id: "k4", title: "Implementar Kanban físico", description: "Instalar quadros na fábrica", assignee: "João" },
     ],
   },
   {
     id: "done",
     title: "Feito",
     items: [
-      { id: "k5", title: "Atualizar procedimentos", description: "Documentar novos processos", priority: "low" },
-      { id: "k6", title: "Análise de indicadores", description: "Relatório mensal completo", priority: "low" },
+      { id: "k5", title: "Atualizar procedimentos", description: "Documentar novos processos" },
+      { id: "k6", title: "Análise de indicadores", description: "Relatório mensal completo" },
     ],
   },
 ];
@@ -200,13 +201,10 @@ const initialPareto: ParetoItem[] = [
   { id: "p5", cause: "Outros", frequency: 3 },
 ];
 
-const priorityColors = {
-  low: "bg-success/10 text-success",
-  medium: "bg-warning/10 text-warning",
-  high: "bg-destructive/10 text-destructive",
-};
 
 export default function GestaoVisual() {
+  const { profile } = useAuth();
+  const { addNotification } = useAppStore();
   const [activeTab, setActiveTab] = useState("kanban");
   const [kanbanData, setKanbanData] = useState<KanbanColumn[]>(initialKanban);
   const [gutData, setGutData] = useState<GUTItem[]>(initialGUT);
@@ -218,7 +216,7 @@ export default function GestaoVisual() {
   const [zoom, setZoom] = useState(1);
 
   // Dialog states
-  const [newKanbanItem, setNewKanbanItem] = useState<{ title: string; description: string; priority: "low" | "medium" | "high"; columnId: string }>({ title: "", description: "", priority: "medium", columnId: "backlog" });
+  const [newKanbanItem, setNewKanbanItem] = useState<{ title: string; description: string; columnId: string }>({ title: "", description: "", columnId: "todo" });
   const [newGutItem, setNewGutItem] = useState({ problem: "", gravity: 3, urgency: 3, trend: 3 });
   const [newEisenhowerItem, setNewEisenhowerItem] = useState<{ task: string; quadrant: EisenhowerItem["quadrant"] }>({ task: "", quadrant: "do" });
   const [newW5H2Item, setNewW5H2Item] = useState<Omit<W5H2Item, "id">>({ what: "", why: "", where: "", when: "", who: "", how: "", howMuch: "" });
@@ -256,14 +254,19 @@ export default function GestaoVisual() {
       id: `k${Date.now()}`,
       title: newKanbanItem.title,
       description: newKanbanItem.description,
-      priority: newKanbanItem.priority,
     };
     setKanbanData((prev) =>
       prev.map((col) =>
         col.id === newKanbanItem.columnId ? { ...col, items: [...col.items, newItem] } : col
       )
     );
-    setNewKanbanItem({ title: "", description: "", priority: "medium", columnId: "backlog" });
+    addNotification({
+      userName: profile?.name || "Usuário",
+      action: "CRIOU",
+      resource: "Kanban",
+      details: `Criou uma nova tarefa: "${newItem.title}"`,
+    });
+    setNewKanbanItem({ title: "", description: "", columnId: "todo" });
     setDialogOpen(false);
   };
 
@@ -275,6 +278,12 @@ export default function GestaoVisual() {
       score,
     };
     setGutData((prev) => [...prev, newItem].sort((a, b) => b.score - a.score));
+    addNotification({
+      userName: profile?.name || "Usuário",
+      action: "CRIOU",
+      resource: "Matriz GUT",
+      details: `Adicionou um problema à Matriz GUT: "${newItem.problem}"`,
+    });
     setNewGutItem({ problem: "", gravity: 3, urgency: 3, trend: 3 });
     setDialogOpen(false);
   };
@@ -286,6 +295,12 @@ export default function GestaoVisual() {
       quadrant: newEisenhowerItem.quadrant,
     };
     setEisenhowerData((prev) => [...prev, newItem]);
+    addNotification({
+      userName: profile?.name || "Usuário",
+      action: "CRIOU",
+      resource: "Eisenhower",
+      details: `Adicionou uma tarefa à Matriz Eisenhower: "${newItem.task}"`,
+    });
     setNewEisenhowerItem({ task: "", quadrant: "do" });
     setDialogOpen(false);
   };
@@ -296,6 +311,12 @@ export default function GestaoVisual() {
       ...newW5H2Item,
     };
     setW5H2Data((prev) => [...prev, newItem]);
+    addNotification({
+      userName: profile?.name || "Usuário",
+      action: "CRIOU",
+      resource: "W5H2",
+      details: `Adicionou um plano de ação (W5H2): "${newItem.what}"`,
+    });
     setNewW5H2Item({ what: "", why: "", where: "", when: "", who: "", how: "", howMuch: "" });
     setDialogOpen(false);
   };
@@ -307,33 +328,75 @@ export default function GestaoVisual() {
       frequency: newParetoItem.frequency,
     };
     setParetoData((prev) => [...prev, newItem]);
+    addNotification({
+      userName: profile?.name || "Usuário",
+      action: "CRIOU",
+      resource: "Pareto",
+      details: `Adicionou uma causa ao Diagrama de Pareto: "${newItem.cause}"`,
+    });
     setNewParetoItem({ cause: "", frequency: 0 });
     setDialogOpen(false);
   };
 
   // Delete functions
   const deleteKanbanItem = (columnId: string, itemId: string) => {
+    const column = kanbanData.find(c => c.id === columnId);
+    const item = column?.items.find(i => i.id === itemId);
     setKanbanData((prev) =>
       prev.map((col) =>
         col.id === columnId ? { ...col, items: col.items.filter((item) => item.id !== itemId) } : col
       )
     );
+    addNotification({
+      userName: profile?.name || "Usuário",
+      action: "EXCLUIU",
+      resource: "Kanban",
+      details: `Excluiu a tarefa: "${item?.title || "Desconhecida"}"`,
+    });
   };
 
   const deleteGutItem = (id: string) => {
+    const item = gutData.find(i => i.id === id);
     setGutData((prev) => prev.filter((item) => item.id !== id));
+    addNotification({
+      userName: profile?.name || "Usuário",
+      action: "EXCLUIU",
+      resource: "Matriz GUT",
+      details: `Excluiu o problema: "${item?.problem || "Desconhecido"}"`,
+    });
   };
 
   const deleteEisenhowerItem = (id: string) => {
+    const item = eisenhowerData.find(i => i.id === id);
     setEisenhowerData((prev) => prev.filter((item) => item.id !== id));
+    addNotification({
+      userName: profile?.name || "Usuário",
+      action: "EXCLUIU",
+      resource: "Eisenhower",
+      details: `Excluiu a tarefa: "${item?.task || "Desconhecida"}"`,
+    });
   };
 
   const deleteW5H2Item = (id: string) => {
+    const item = w5h2Data.find(i => i.id === id);
     setW5H2Data((prev) => prev.filter((item) => item.id !== id));
+    addNotification({
+      userName: profile?.name || "Usuário",
+      action: "EXCLUIU",
+      resource: "W5H2",
+      details: `Excluiu o plano de ação: "${item?.what || "Desconhecido"}"`,
+    });
   };
 
   const deleteParetoItem = (id: string) => {
+    const item = paretoData.find(i => i.id === id);
     setParetoData((prev) => prev.filter((item) => item.id !== id));
+    addNotification({
+      userName: profile?.name || "Usuário",
+      action: "EXCLUIU",
+      resource: "Pareto",
+      details: `Excluiu a causa: "${item?.cause || "Desconhecida"}"`,
+    });
   };
 
   // Update functions
@@ -404,6 +467,14 @@ export default function GestaoVisual() {
         return col;
       })
     );
+
+    const targetCol = kanbanData.find((c) => c.id === toColumn);
+    addNotification({
+      userName: profile?.name || "Usuário",
+      action: "EDITOU",
+      resource: "Kanban",
+      details: `Moveu a tarefa "${item.title}" para "${targetCol?.title || toColumn}"`,
+    });
   };
 
   const renderAddDialog = () => {
@@ -427,23 +498,7 @@ export default function GestaoVisual() {
                 placeholder="Descrição da tarefa"
               />
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="text-sm font-medium">Prioridade</label>
-                <Select
-                  value={newKanbanItem.priority}
-                  onValueChange={(v) => setNewKanbanItem((p) => ({ ...p, priority: v as "low" | "medium" | "high" }))}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="low">Baixa</SelectItem>
-                    <SelectItem value="medium">Média</SelectItem>
-                    <SelectItem value="high">Alta</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+            <div className="grid grid-cols-1 gap-4">
               <div>
                 <label className="text-sm font-medium">Coluna</label>
                 <Select
@@ -761,9 +816,9 @@ export default function GestaoVisual() {
                       key={item.id}
                       className={cn(
                         "stat-card p-3 hover:shadow-lg transition-all group border-l-4",
-                        item.priority === "high" && "border-l-destructive",
-                        item.priority === "medium" && "border-l-warning",
-                        item.priority === "low" && "border-l-primary",
+                        column.id === "todo" && "border-l-gray-400",
+                        column.id === "doing" && "border-l-orange-500",
+                        column.id === "done" && "border-l-green-500",
                         editingKanban === item.id && "cursor-default"
                       )}
                     >
@@ -787,19 +842,6 @@ export default function GestaoVisual() {
                                 className="text-xs min-h-[40px]"
                                 placeholder="Descrição"
                               />
-                              <Select
-                                value={item.priority}
-                                onValueChange={(v) => updateKanbanItem(column.id, item.id, "priority", v)}
-                              >
-                                <SelectTrigger className="h-7 text-xs">
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="low">Baixa</SelectItem>
-                                  <SelectItem value="medium">Média</SelectItem>
-                                  <SelectItem value="high">Alta</SelectItem>
-                                </SelectContent>
-                              </Select>
                               <Button
                                 size="sm"
                                 className="w-full h-7"
@@ -845,31 +887,6 @@ export default function GestaoVisual() {
                           </Button>
                         </div>
                       </div>
-                      {editingKanban !== item.id && (
-                        <div className="flex items-center justify-between mt-2">
-                          <Badge className={cn("text-xs", priorityColors[item.priority])}>
-                            {item.priority === "low" && "Baixa"}
-                            {item.priority === "medium" && "Média"}
-                            {item.priority === "high" && "Alta"}
-                          </Badge>
-
-                          <Select
-                            value={column.id}
-                            onValueChange={(toColumn) => moveKanbanItem(item.id, column.id, toColumn)}
-                          >
-                            <SelectTrigger className="h-7 w-[120px] text-xs">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent className="bg-popover z-50">
-                              {kanbanData.map((c) => (
-                                <SelectItem key={c.id} value={c.id}>
-                                  {c.title}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      )}
                     </div>
                   ))}
                 </div>

@@ -1,6 +1,9 @@
 import { Sidebar } from "./Sidebar";
 import { Outlet, useNavigate } from "react-router-dom";
-import { Bell, Search, User, LogOut, Settings, Sun, Moon, Shield, Edit2, Upload, Loader2, Camera } from "lucide-react";
+import { Bell, Search, User, LogOut, Settings, Sun, Moon, Shield, Edit2, Upload, Loader2, Camera, Plus, Trash2 } from "lucide-react";
+import { formatDistanceToNow } from "date-fns";
+import { ptBR } from "date-fns/locale";
+import { useAppStore } from "@/hooks/useAppStore";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
@@ -242,7 +245,8 @@ function ProfileDialog({ isOpen, onClose, profile }: ProfileDialogProps) {
 export function MainLayout() {
   const [collapsed, setCollapsed] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
-  const { profile, isAdmin, signOut, user } = useAuth();
+  const { profile, isAdmin, isManager, signOut, user } = useAuth();
+  const { notifications, markAllNotificationsAsRead } = useAppStore();
   const navigate = useNavigate();
   const { theme, setTheme } = useTheme();
 
@@ -293,12 +297,88 @@ export function MainLayout() {
               <Moon className="absolute h-5 w-5 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
             </Button>
 
-            <Button variant="ghost" size="icon" className="relative">
-              <Bell className="h-5 w-5" />
-              <span className="absolute -top-1 -right-1 h-4 w-4 bg-primary rounded-full text-[10px] flex items-center justify-center text-primary-foreground font-bold">
-                3
-              </span>
-            </Button>
+            {(isAdmin || isManager) && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon" className="relative">
+                    <Bell className="h-5 w-5" />
+                    {notifications.filter((n) => !n.read).length > 0 && (
+                      <span className="absolute -top-1 -right-1 h-4 w-4 bg-primary rounded-full text-[10px] flex items-center justify-center text-primary-foreground font-bold">
+                        {notifications.filter((n) => !n.read).length}
+                      </span>
+                    )}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-80 p-0">
+                  <DropdownMenuLabel className="p-4 border-b">
+                    <div className="flex items-center justify-between">
+                      <span>Notificações</span>
+                      {notifications.length > 0 && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => markAllNotificationsAsRead()}
+                          className="h-auto p-0 text-xs text-primary font-normal hover:bg-transparent"
+                        >
+                          Marcar todas como lidas
+                        </Button>
+                      )}
+                    </div>
+                  </DropdownMenuLabel>
+                  <div className="max-h-[400px] overflow-y-auto">
+                    {notifications.length === 0 ? (
+                      <div className="p-8 text-center space-y-2">
+                        <Bell className="h-8 w-8 text-muted-foreground/30 mx-auto" />
+                        <p className="text-sm text-muted-foreground">Nenhuma notificação por enquanto</p>
+                      </div>
+                    ) : (
+                      notifications.map((n) => (
+                        <div
+                          key={n.id}
+                          className={cn(
+                            "p-4 border-b last:border-0 hover:bg-secondary/20 transition-colors",
+                            !n.read && "bg-primary/5"
+                          )}
+                        >
+                          <div className="flex items-start gap-3">
+                            <div
+                              className={cn(
+                                "p-1.5 rounded-full mt-0.5",
+                                n.action === "CRIOU" && "bg-green-100 text-green-700",
+                                n.action === "EDITOU" && "bg-blue-100 text-blue-700",
+                                n.action === "EXCLUIU" && "bg-red-100 text-red-700"
+                              )}
+                            >
+                              {n.action === "CRIOU" && <Plus className="h-3 w-3" />}
+                              {n.action === "EDITOU" && <Edit2 className="h-3 w-3" />}
+                              {n.action === "EXCLUIU" && <Trash2 className="h-3 w-3" />}
+                            </div>
+                            <div className="flex-1 space-y-1">
+                              <p className="text-sm">
+                                <span className="font-semibold text-foreground">{n.userName}</span>{" "}
+                                <span className="text-muted-foreground">
+                                  {n.action.toLowerCase()} {n.resource}
+                                </span>
+                              </p>
+                              <p className="text-xs text-muted-foreground leading-relaxed italic">
+                                "{n.details}"
+                              </p>
+                              <p className="text-[10px] text-muted-foreground pt-1 flex items-center gap-1">
+                                <span className="w-1 h-1 rounded-full bg-muted-foreground" />
+                                {formatDistanceToNow(new Date(n.timestamp), {
+                                  addSuffix: true,
+                                  locale: ptBR,
+                                })}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
 
             <div className="flex items-center gap-3 pl-4 border-l border-border">
               {user && (

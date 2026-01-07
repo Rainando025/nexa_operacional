@@ -33,6 +33,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useAppStore, OKR, KeyResult } from "@/hooks/useAppStore";
 import { OKRModal } from "@/components/modals/OKRModal";
+import { useAuth } from "@/hooks/useAuth";
 
 const statusConfig = {
   completed: { icon: CheckCircle2, color: "text-success", bg: "bg-success/10" },
@@ -42,7 +43,8 @@ const statusConfig = {
 };
 
 export default function OKRs() {
-  const { okrs, addOKR, updateOKR, deleteOKR } = useAppStore();
+  const { okrs, addOKR, updateOKR, deleteOKR, addNotification } = useAppStore();
+  const { profile } = useAuth();
   const [expandedOKRs, setExpandedOKRs] = useState<string[]>(okrs.slice(0, 2).map(o => o.id));
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingOKR, setEditingOKR] = useState<OKR | undefined>();
@@ -76,14 +78,33 @@ export default function OKRs() {
   const handleSubmit = (data: Omit<OKR, "id">) => {
     if (editingOKR) {
       updateOKR(editingOKR.id, data);
+      addNotification({
+        userName: profile?.name || "Usuário",
+        action: "EDITOU",
+        resource: "OKR",
+        details: `Editou o objetivo: "${data.objective}"`,
+      });
     } else {
       addOKR(data);
+      addNotification({
+        userName: profile?.name || "Usuário",
+        action: "CRIOU",
+        resource: "OKR",
+        details: `Criou o novo objetivo: "${data.objective}"`,
+      });
     }
   };
 
   const handleDelete = () => {
     if (deletingId) {
+      const okrToDelete = okrs.find((o) => o.id === deletingId);
       deleteOKR(deletingId);
+      addNotification({
+        userName: profile?.name || "Usuário",
+        action: "EXCLUIU",
+        resource: "OKR",
+        details: `Excluiu o objetivo: "${okrToDelete?.objective || "Desconhecido"}"`,
+      });
       setDeletingId(null);
     }
   };
@@ -181,7 +202,7 @@ export default function OKRs() {
             >
               {/* Objective Header */}
               <div className="flex items-start gap-4">
-                <button 
+                <button
                   className="mt-1 text-muted-foreground hover:text-foreground transition-colors"
                   onClick={() => toggleExpand(okr.id)}
                 >
@@ -191,7 +212,7 @@ export default function OKRs() {
                     <ChevronRight className="h-5 w-5" />
                   )}
                 </button>
-                <div 
+                <div
                   className="flex-1 min-w-0 cursor-pointer"
                   onClick={() => toggleExpand(okr.id)}
                 >
@@ -217,7 +238,7 @@ export default function OKRs() {
                             <Edit className="h-4 w-4 mr-2" />
                             Editar
                           </DropdownMenuItem>
-                          <DropdownMenuItem 
+                          <DropdownMenuItem
                             className="text-destructive"
                             onClick={() => setDeletingId(okr.id)}
                           >

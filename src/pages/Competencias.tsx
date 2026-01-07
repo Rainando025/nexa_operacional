@@ -20,6 +20,8 @@ import {
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/hooks/useAuth";
+import { useAppStore } from "@/hooks/useAppStore";
 
 const initialSkills = [
   "Liderança",
@@ -96,6 +98,8 @@ const levelLabels = {
 
 
 export default function Competencias() {
+  const { profile } = useAuth();
+  const { addNotification } = useAppStore();
   const [selectedDepartment, setSelectedDepartment] = useState("all");
   const [employees, setEmployees] = useState(initialEmployees);
   const [skills] = useState(initialSkills);
@@ -122,6 +126,8 @@ export default function Competencias() {
     .sort((a, b) => b.gap - a.gap);
 
   const updateCompetencyLevel = (empId: number, skillIdx: number, newLevel: number) => {
+    const employee = employees.find(e => e.id === empId);
+    const skillName = skills[skillIdx];
     setEmployees((prev) =>
       prev.map((emp) =>
         emp.id === empId
@@ -129,14 +135,33 @@ export default function Competencias() {
           : emp
       )
     );
+    addNotification({
+      userName: profile?.name || "Usuário",
+      action: "EDITOU",
+      resource: "Competências",
+      details: `Alterou o nível da competência "${skillName}" de ${employee?.name} para ${newLevel}`,
+    });
   };
 
   const deleteEmployee = (empId: number) => {
+    const employee = employees.find(e => e.id === empId);
     setEmployees((prev) => prev.filter((emp) => emp.id !== empId));
+    addNotification({
+      userName: profile?.name || "Usuário",
+      action: "EXCLUIU",
+      resource: "Competências",
+      details: `Removeu o colaborador ${employee?.name} da matriz`,
+    });
   };
 
   const addEmployee = (employee: typeof initialEmployees[0]) => {
     setEmployees((prev) => [...prev, employee]);
+    addNotification({
+      userName: profile?.name || "Usuário",
+      action: "CRIOU",
+      resource: "Competências",
+      details: `Adicionou o colaborador ${employee.name} à matriz`,
+    });
   };
 
   return (

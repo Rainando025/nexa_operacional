@@ -20,6 +20,7 @@ interface AuthContextType {
   session: Session | null;
   profile: Profile | null;
   isAdmin: boolean;
+  isManager: boolean;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signUp: (email: string, password: string, name: string) => Promise<{ error: Error | null }>;
@@ -34,6 +35,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [isManager, setIsManager] = useState(false);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
@@ -62,6 +64,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const profileData = await fetchProfile(user.id);
       setProfile(profileData);
       setIsAdmin(profileData?.role === "admin");
+      setIsManager(profileData?.role === "admin" || profileData?.role === "gerente");
     }
   };
 
@@ -78,11 +81,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             fetchProfile(session.user.id).then((data) => {
               setProfile(data);
               setIsAdmin(data?.role === "admin");
+              setIsManager(data?.role === "admin" || data?.role === "gerente");
             });
           }, 0);
         } else {
           setProfile(null);
           setIsAdmin(false);
+          setIsManager(false);
         }
 
         setLoading(false);
@@ -98,6 +103,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         fetchProfile(session.user.id).then((data) => {
           setProfile(data);
           setIsAdmin(data?.role === "admin");
+          setIsManager(data?.role === "admin" || data?.role === "gerente");
         });
       }
 
@@ -155,6 +161,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setSession(null);
     setProfile(null);
     setIsAdmin(false);
+    setIsManager(false);
   };
 
   return (
@@ -164,6 +171,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         session,
         profile,
         isAdmin,
+        isManager,
         loading,
         signIn,
         signUp,

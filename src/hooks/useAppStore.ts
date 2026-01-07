@@ -58,6 +58,16 @@ export interface Process {
   content?: string;
 }
 
+export interface ActionNotification {
+  id: string;
+  userName: string;
+  action: "CRIOU" | "EDITOU" | "EXCLUIU";
+  resource: string;
+  details: string;
+  timestamp: string;
+  read: boolean;
+}
+
 // Initial Data
 const initialTrainings: Training[] = [
   {
@@ -191,6 +201,7 @@ const saveToStorage = (key: string, value: any) => {
 let trainings = loadFromStorage("trainings", initialTrainings);
 let kpis = loadFromStorage("kpis", initialKPIs);
 let okrs = loadFromStorage("okrs", []); // OKRs history not needed for now
+let notifications = loadFromStorage("notifications", []);
 
 let listeners: (() => void)[] = [];
 
@@ -198,6 +209,7 @@ const notifyListeners = () => {
   saveToStorage("trainings", trainings);
   saveToStorage("kpis", kpis);
   saveToStorage("okrs", okrs);
+  saveToStorage("notifications", notifications);
   listeners.forEach((l) => l());
 };
 
@@ -282,6 +294,22 @@ export function useAppStore() {
     notifyListeners();
   }, []);
 
+  const addNotification = useCallback((notification: Omit<ActionNotification, "id" | "timestamp" | "read">) => {
+    const newNote: ActionNotification = {
+      ...notification,
+      id: Date.now().toString(),
+      timestamp: new Date().toISOString(),
+      read: false,
+    };
+    notifications = [newNote, ...notifications].slice(0, 50);
+    notifyListeners();
+  }, []);
+
+  const markAllNotificationsAsRead = useCallback(() => {
+    notifications = notifications.map((n: ActionNotification) => ({ ...n, read: true }));
+    notifyListeners();
+  }, []);
+
   return {
     trainings,
     kpis,
@@ -296,6 +324,9 @@ export function useAppStore() {
     addOKR,
     updateOKR,
     deleteOKR,
+    notifications,
+    addNotification,
+    markAllNotificationsAsRead,
   };
 }
 

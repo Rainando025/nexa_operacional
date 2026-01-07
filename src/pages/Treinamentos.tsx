@@ -21,6 +21,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/hooks/useAuth";
 import { useAppStore, Training } from "@/hooks/useAppStore";
 import { TrainingModal } from "@/components/modals/TrainingModal";
 import {
@@ -164,7 +165,7 @@ export default function Treinamentos() {
       {/* Training Cards */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {filteredTrainings.map((training, index) => {
-          const progress = training.participants > 0 
+          const progress = training.participants > 0
             ? Math.round((training.completed / training.participants) * 100)
             : 0;
           const status = statusConfig[training.status as keyof typeof statusConfig];
@@ -192,7 +193,7 @@ export default function Treinamentos() {
                     <DropdownMenuItem onClick={() => handleEdit(training)}>
                       Editar
                     </DropdownMenuItem>
-                    <DropdownMenuItem 
+                    <DropdownMenuItem
                       className="text-destructive"
                       onClick={() => setDeletingId(training.id)}
                     >
