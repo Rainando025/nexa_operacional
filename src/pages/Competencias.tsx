@@ -11,6 +11,9 @@ import {
 } from "lucide-react";
 import AvaliacaoModal from "@/components/modals/AvaliacaoModal";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import {
   Select,
@@ -107,7 +110,7 @@ export default function Competencias() {
   const { toast } = useToast();
   const [selectedDepartment, setSelectedDepartment] = useState("all");
   const [employees, setEmployees] = useState<any[]>([]);
-  const [skills] = useState(initialSkills);
+  const [skills, setSkills] = useState(initialSkills);
   const [loading, setLoading] = useState(true);
   const [avaliacaoModalOpen, setAvaliacaoModalOpen] = useState(false);
   const [allDepartments, setAllDepartments] = useState<any[]>([]);
@@ -314,6 +317,75 @@ export default function Competencias() {
     })();
   };
 
+  const [editSkillsOpen, setEditSkillsOpen] = useState(false);
+  const [editedSkills, setEditedSkills] = useState<string[]>(skills);
+
+  const renameSkill = async (oldName: string, newName: string) => {
+    if (oldName === newName) return;
+    try {
+      // fetch all rows with oldName
+      const { data, error } = await supabase.from("competency_levels").select("*").eq("skill_name", oldName);
+      if (error) throw error;
+
+      // Upsert rows with newName (will create or update existing entries)
+      if (data && data.length > 0) {
+        for (const r of data) {
+          const upsert = await supabase.from("competency_levels").upsert({
+            user_id: r.user_id,
+            skill_name: newName,
+            level: r.level,
+            updated_at: new Date().toISOString(),
+          }, { onConflict: "user_id,skill_name" });
+          if (upsert.error) console.error("Upsert error for renameSkill:", upsert.error);
+        }
+
+        // remove old rows
+        const del = await supabase.from("competency_levels").delete().eq("skill_name", oldName);
+        if (del.error) console.error("Delete old skill rows error:", del.error);
+      }
+    } catch (err) {
+      console.error("Error renaming skill:", err);
+      throw err;
+    }
+  };
+
+  const handleSaveSkills = async () => {
+    // validate
+    const trimmed = editedSkills.map((s) => s.trim());
+    if (trimmed.some((s) => s === "")) {
+      toast({ title: "Nome inválido", description: "Os nomes das competências não podem ficar vazios.", variant: "destructive" });
+      return;
+    }
+    const unique = new Set(trimmed);
+    if (unique.size !== trimmed.length) {
+      toast({ title: "Nomes duplicados", description: "Cada competência deve ter um nome único.", variant: "destructive" });
+      return;
+    }
+
+    try {
+      // apply renames for changed skills
+      for (let i = 0; i < trimmed.length; i++) {
+        const oldName = skills[i];
+        const newName = trimmed[i];
+        if (oldName !== newName) {
+          await renameSkill(oldName, newName);
+        }
+      }
+
+      setSkills(trimmed);
+      setEditSkillsOpen(false);
+      toast({ title: "Competências atualizadas", description: "Nomes atualizados com sucesso." });
+      addNotification({
+        userName: (profile as any)?.name || "Administrador",
+        action: "EDITOU",
+        resource: "Competências",
+        details: `Atualizou os nomes das competências`,
+      });
+    } catch (err) {
+      toast({ title: "Erro ao salvar", description: "Não foi possível atualizar as competências.", variant: "destructive" });
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Page Header */}
@@ -324,10 +396,17 @@ export default function Competencias() {
             Matriz de competências e desenvolvimento de equipe
           </p>
         </div>
-        <Button className="gap-2" onClick={() => setAvaliacaoModalOpen(true)}>
-          <Plus className="h-4 w-4" />
-          Nova Avaliação
-        </Button>
+          <div className="flex items-center gap-2">
+            <Button className="gap-2" onClick={() => setAvaliacaoModalOpen(true)}>
+              <Plus className="h-4 w-4" />
+              Nova Avaliação
+            </Button>
+            {(isAdmin || profile?.role === "gerente") && (
+              <Button variant="outline" size="sm" onClick={() => { setEditedSkills(skills); setEditSkillsOpen(true); }}>
+                Editar Competências
+              </Button>
+            )}
+          </div>
       </div>
 
       <AvaliacaoModal
@@ -337,6 +416,28 @@ export default function Competencias() {
         skills={skills}
         departments={departments}
       />
+
+      <Dialog open={editSkillsOpen} onOpenChange={setEditSkillsOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Editar nomes das competências</DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-3 py-2">
+            {editedSkills.map((s, i) => (
+              <div key={i} className="space-y-1">
+                <Label className="text-xs">{`Competência ${i + 1}`}</Label>
+                <Input value={editedSkills[i]} onChange={(e) => setEditedSkills((prev) => prev.map((p, idx) => idx === i ? e.target.value : p))} />
+              </div>
+            ))}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditSkillsOpen(false)}>Cancelar</Button>
+            <Button onClick={handleSaveSkills}>Salvar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <div className="space-y-6 mt-6">
         {/* Stats */}

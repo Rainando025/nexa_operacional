@@ -802,7 +802,7 @@ export default function GestaoVisual() {
               <div
                 key={column.id}
                 className={cn(
-                  "flex-shrink-0 w-72 bg-secondary/30 rounded-lg p-4 space-y-3 border-t-4",
+                  "flex-shrink-0 w-56 bg-secondary/30 rounded-lg p-3 space-y-3 border-t-4",
                   column.id === "todo" && "border-t-gray-400",
                   column.id === "doing" && "border-t-orange-500",
                   column.id === "done" && "border-t-green-500"
@@ -812,12 +812,12 @@ export default function GestaoVisual() {
                   <h3 className="font-semibold">{column.title}</h3>
                   <Badge variant="secondary">{column.items.length}</Badge>
                 </div>
-                <div className="space-y-2 min-h-[200px]">
+                <div className="space-y-2">
                   {column.items.map((item) => (
                     <div
                       key={item.id}
                       className={cn(
-                        "stat-card p-3 hover:shadow-lg transition-all group border border-border/50 border-l-4",
+                        "stat-card p-2 hover:shadow-lg transition-all group border border-border/50 border-l-4",
                         column.id === "todo" && "border-l-gray-400",
                         column.id === "doing" && "border-l-orange-500",
                         column.id === "done" && "border-l-green-500",
@@ -858,7 +858,7 @@ export default function GestaoVisual() {
                           ) : (
                             <div onClick={() => setEditingKanban(item.id)} className="cursor-pointer">
                               <p className="font-medium text-sm">{item.title}</p>
-                              <p className="text-xs text-muted-foreground mt-1 truncate">{item.description}</p>
+                              <p className="text-xs text-muted-foreground mt-1">{item.description}</p>
                             </div>
                           )}
                         </div>
