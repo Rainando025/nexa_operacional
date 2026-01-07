@@ -169,13 +169,22 @@ export default function Competencias() {
       });
 
       setEmployees(mappedEmployees);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching competency data:", error);
-      toast({
-        title: "Erro ao carregar dados",
-        description: "Não foi possível carregar a matriz de competências.",
-        variant: "destructive",
-      });
+      const msg = (error?.message || String(error)).toLowerCase();
+      if (msg.includes("relation \"competency_levels\" does not exist") || msg.includes("competency_levels")) {
+        toast({
+          title: "Tabela de competências ausente",
+          description: "A tabela `competency_levels` não existe no banco. Rode as migrações (ver supabase/migrations) para criá-la.",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Erro ao carregar dados",
+          description: "Não foi possível carregar a matriz de competências.",
+          variant: "destructive",
+        });
+      }
     } finally {
       setLoading(false);
     }
@@ -265,8 +274,44 @@ export default function Competencias() {
   };
 
   const addEmployee = (employee: any) => {
-    // Same here, users are added in admin/auth
-    fetchData();
+    if (!employee || !employee.name) return;
+    (async () => {
+      try {
+        const userId = `new_${Date.now()}`;
+        const inserts = skills.map((skill: string, idx: number) => ({
+          user_id: userId,
+          skill_name: skill,
+          level: employee.levels[idx] || 0,
+          updated_at: new Date().toISOString(),
+        }));
+
+        const { error } = await supabase.from("competency_levels").insert(inserts);
+        if (error) throw error;
+
+        const newEmp = {
+          id: Date.now(),
+          user_id: userId,
+          name: employee.name,
+          avatar_url: null,
+          role: employee.role,
+          department: employee.department,
+          department_id: null,
+          levels: employee.levels,
+        };
+
+        setEmployees((prev) => [...prev, newEmp]);
+        toast({ title: "Avaliação adicionada", description: "Avaliação salva com sucesso." });
+        addNotification({
+          userName: profile?.name || "Usuário",
+          action: "CRIOU",
+          resource: "Competências",
+          details: `Adicionou avaliação de ${employee.name}`,
+        });
+      } catch (error) {
+        console.error("Error creating evaluation:", error);
+        toast({ title: "Erro ao salvar", description: "Não foi possível salvar a avaliação.", variant: "destructive" });
+      }
+    })();
   };
 
   return (

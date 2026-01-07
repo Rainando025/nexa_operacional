@@ -9,6 +9,7 @@ import {
   Clock,
   CheckCircle2,
   PlayCircle,
+  Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -48,6 +49,7 @@ export default function Treinamentos() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingTraining, setEditingTraining] = useState<Training | undefined>();
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [showArchived, setShowArchived] = useState(false);
 
   const filteredTrainings = trainings.filter((t) =>
     t.title.toLowerCase().includes(searchQuery.toLowerCase())
@@ -182,9 +184,18 @@ export default function Treinamentos() {
         </Button>
       </div>
 
+      <div className="flex items-center justify-between">
+        <h2 className="sr-only">Treinamentos ativos</h2>
+        <Button variant="outline" size="sm" onClick={() => setShowArchived((s) => !s)}>
+          {showArchived ? "Ocultar Arquivados" : "Mostrar Arquivados"}
+        </Button>
+      </div>
+
       {/* Training Cards */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {filteredTrainings.map((training, index) => {
+          // only show non-completed trainings here
+          if (training.status === "completed") return null;
           const progress = training.participants > 0
             ? Math.round((training.completed / training.participants) * 100)
             : 0;
@@ -215,6 +226,21 @@ export default function Treinamentos() {
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
+                    {training.status !== "completed" && (
+                      <DropdownMenuItem
+                        onClick={() => {
+                          updateTraining(training.id, { status: "completed" });
+                          addNotification({
+                            userName: profile?.name || "Usuário",
+                            action: "EDITOU",
+                            resource: "Treinamento",
+                            details: `Finalizou/arquivou o treinamento: "${training.title}"`,
+                          });
+                        }}
+                      >
+                        Marcar como Concluído
+                      </DropdownMenuItem>
+                    )}
                     <DropdownMenuItem onClick={() => handleEdit(training)}>
                       Editar
                     </DropdownMenuItem>
@@ -261,6 +287,65 @@ export default function Treinamentos() {
           );
         })}
       </div>
+
+      {/* Arquivados (toggle) */}
+      {showArchived && (
+        <div className="mt-8">
+          <h3 className="text-lg font-semibold mb-4">Arquivados</h3>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {trainings.filter((t) => t.status === "completed").map((training) => (
+              <div key={training.id} className="stat-card opacity-80">
+                <div className="flex items-start justify-between mb-4">
+                  <div className="space-y-1">
+                    <Badge variant="secondary" className="text-xs">
+                      {training.category}
+                    </Badge>
+                    <h3 className="font-semibold text-lg">{training.title}</h3>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={() => setDeletingId(training.id)}
+                      title="Excluir arquivado"
+                    >
+                      <Trash2 className="h-4 w-4 text-destructive" />
+                    </Button>
+                  </div>
+                </div>
+                <div className="space-y-4">
+                  <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                    <div className="flex items-center gap-1">
+                      <Users className="h-4 w-4" />
+                      <span>{training.participants} participantes</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <Clock className="h-4 w-4" />
+                      <span>{training.duration}</span>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">Progresso</span>
+                      <span className="font-medium">{Math.round((training.completed / (training.participants || 1)) * 100)}%</span>
+                    </div>
+                    <Progress value={Math.round((training.completed / (training.participants || 1)) * 100)} className="h-2" />
+                  </div>
+
+                  <div className="flex items-center justify-between pt-2 border-t border-border">
+                    <Badge className={cn("text-xs", statusConfig[training.status as keyof typeof statusConfig].color)}>
+                      {statusConfig[training.status as keyof typeof statusConfig].label}
+                    </Badge>
+                    <span className="text-xs text-muted-foreground">Prazo: {training.deadline}</span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Modal */}
       <TrainingModal

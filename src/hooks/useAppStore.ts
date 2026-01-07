@@ -59,12 +59,14 @@ export interface Process {
 
 export interface ActionNotification {
   id: string;
-  user_name: string;
+  user_name?: string;
   action: "CRIOU" | "EDITOU" | "EXCLUIU";
   resource: string;
   details: string;
   timestamp: string;
-  read_by_admins: string[]; // UUID array
+  read_by_admins?: string[]; // UUID array
+  // local field for UI
+  read?: boolean;
 }
 
 // Initial Data
@@ -157,7 +159,17 @@ const fetchNotifications = async () => {
       .limit(50);
 
     if (error) throw error;
-    notifications = data || [];
+    // Normalize shape for UI (userName, read)
+    notifications = (data || []).map((n: any) => ({
+      id: n.id?.toString() || Date.now().toString(),
+      user_name: n.user_name || n.userName || n.user_name,
+      action: n.action,
+      resource: n.resource,
+      details: n.details,
+      timestamp: n.timestamp || n.created_at || new Date().toISOString(),
+      read: !!(n.read || (n.read_by_admins && n.read_by_admins.length > 0)),
+      read_by_admins: n.read_by_admins || [],
+    }));
     notifyListeners();
   } catch (err) {
     console.error("Error fetching notifications:", err);
@@ -178,14 +190,25 @@ export function useAppStore() {
     // Subscribe to realtime notifications
     const channel = supabase
       .channel("global_notifications")
-      .on(
-        "postgres_changes",
-        { event: "INSERT", schema: "public", table: "notifications" },
-        (payload) => {
-          notifications = [payload.new as ActionNotification, ...notifications].slice(0, 50);
-          notifyListeners();
-        }
-      )
+        .on(
+          "postgres_changes",
+          { event: "INSERT", schema: "public", table: "notifications" },
+          (payload) => {
+            const n = payload.new as any;
+            const mapped = {
+              id: n.id?.toString() || Date.now().toString(),
+              user_name: n.user_name || n.userName,
+              action: n.action,
+              resource: n.resource,
+              details: n.details,
+              timestamp: n.timestamp || n.created_at || new Date().toISOString(),
+              read: false,
+              read_by_admins: n.read_by_admins || [],
+            } as ActionNotification;
+            notifications = [mapped, ...notifications].slice(0, 50);
+            notifyListeners();
+          }
+        )
       .subscribe();
 
     return () => {
@@ -257,10 +280,11 @@ export function useAppStore() {
     notifyListeners();
   }, []);
 
-  const addNotification = useCallback(async (notification: Omit<ActionNotification, "id" | "timestamp" | "read_by_admins">) => {
+  const addNotification = useCallback(async (notification: Omit<ActionNotification, "id" | "timestamp" | "read_by_admins"> & { userName?: string }) => {
     try {
+      const dbUserName = (notification as any).userName || notification.user_name || "Usuário";
       const { error } = await supabase.from("notifications").insert({
-        user_name: notification.user_name,
+        user_name: dbUserName,
         action: notification.action,
         resource: notification.resource,
         details: notification.details,
@@ -272,13 +296,19 @@ export function useAppStore() {
     }
   }, []);
 
-  const markAllNotificationsAsRead = useCallback(async (adminId: string) => {
+  const markAllNotificationsAsRead = useCallback(async (adminId?: string) => {
     try {
-      // Logic for read_by_admins array in DB is more complex than a simple local read=true
-      // For now, let's keep it simple or implement the array update
-      const { error } = await supabase.rpc('mark_notifications_read', { admin_id: adminId });
-      if (error) throw error;
-      fetchNotifications();
+      // If server RPC available, try to call it when adminId provided
+      if (adminId) {
+        const { error } = await supabase.rpc("mark_notifications_read", { admin_id: adminId });
+        if (error) throw error;
+        await fetchNotifications();
+        return;
+      }
+
+      // Fallback: locally mark all as read
+      notifications = notifications.map((n) => ({ ...n, read: true }));
+      notifyListeners();
     } catch (err) {
       console.error("Error marking as read:", err);
     }
@@ -298,7 +328,11 @@ export function useAppStore() {
     addOKR,
     updateOKR,
     deleteOKR,
-    notifications,
+    notifications: notifications.map((n) => ({
+      ...n,
+      userName: (n as any).user_name || (n as any).userName || "Usuário",
+      read: !!n.read,
+    })),
     addNotification,
     markAllNotificationsAsRead,
     refreshNotifications: fetchNotifications,

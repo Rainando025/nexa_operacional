@@ -20,6 +20,8 @@ import {
   Type,
   Link,
   Zap,
+  ArrowLeft,
+  ArrowRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -862,18 +864,49 @@ export default function GestaoVisual() {
                         </div>
                         <div className="flex flex-col gap-1">
                           {editingKanban !== item.id && (
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-6 w-6 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setEditingKanban(item.id);
-                              }}
-                            >
-                              <Edit className="h-3 w-3" />
-                            </Button>
+                            <>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setEditingKanban(item.id);
+                                }}
+                              >
+                                <Edit className="h-3 w-3" />
+                              </Button>
+
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                title="Mover para a esquerda"
+                                className="h-6 w-6 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  const idx = kanbanData.findIndex((c) => c.id === column.id);
+                                  if (idx > 0) moveKanbanItem(item.id, column.id, kanbanData[idx - 1].id);
+                                }}
+                              >
+                                <ArrowLeft className="h-3 w-3" />
+                              </Button>
+
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                title="Mover para a direita"
+                                className="h-6 w-6 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  const idx = kanbanData.findIndex((c) => c.id === column.id);
+                                  if (idx < kanbanData.length - 1) moveKanbanItem(item.id, column.id, kanbanData[idx + 1].id);
+                                }}
+                              >
+                                <ArrowRight className="h-3 w-3" />
+                              </Button>
+                            </>
                           )}
+
                           <Button
                             variant="ghost"
                             size="icon"
