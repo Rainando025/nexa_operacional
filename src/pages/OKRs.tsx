@@ -515,6 +515,8 @@ export default function OKRs() {
               </AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialog>
-        </div>
-      );
+        </>
+      )}
+    </div>
+  );
 }
