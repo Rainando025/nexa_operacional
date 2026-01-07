@@ -193,7 +193,12 @@ export default function Treinamentos() {
           return (
             <div
               key={training.id}
-              className="stat-card animate-fade-in cursor-pointer"
+              className={cn(
+                "stat-card animate-fade-in cursor-pointer border-2 transition-all hover:shadow-md",
+                training.status === "active" ? "border-info/20 border-t-info" :
+                  training.status === "completed" ? "border-success/20 border-t-success" :
+                    "border-warning/20 border-t-warning"
+              )}
               style={{ animationDelay: `${index * 50}ms` }}
             >
               <div className="flex items-start justify-between mb-4">

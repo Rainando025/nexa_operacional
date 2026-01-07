@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Grid3X3,
   Plus,
@@ -7,6 +7,7 @@ import {
   Award,
   X,
   Trash2,
+  Loader2,
 } from "lucide-react";
 import AvaliacaoModal from "@/components/modals/AvaliacaoModal";
 import { Button } from "@/components/ui/button";
@@ -19,9 +20,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { useAppStore } from "@/hooks/useAppStore";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 
 const initialSkills = [
   "Liderança",
@@ -98,22 +102,100 @@ const levelLabels = {
 
 
 export default function Competencias() {
-  const { profile } = useAuth();
+  const { profile, isAdmin } = useAuth();
   const { addNotification } = useAppStore();
+  const { toast } = useToast();
   const [selectedDepartment, setSelectedDepartment] = useState("all");
-  const [employees, setEmployees] = useState(initialEmployees);
+  const [employees, setEmployees] = useState<any[]>([]);
   const [skills] = useState(initialSkills);
+  const [loading, setLoading] = useState(true);
   const [avaliacaoModalOpen, setAvaliacaoModalOpen] = useState(false);
+  const [allDepartments, setAllDepartments] = useState<any[]>([]);
 
-  const departments = [...new Set(employees.map((e) => e.department))];
+  const fetchData = async () => {
+    if (!profile) return;
+    setLoading(true);
+    try {
+      // Fetch departments
+      const { data: depts } = await supabase.from("departments").select("*");
+      setAllDepartments(depts || []);
+
+      // Fetch profiles
+      let query = supabase
+        .from("profiles")
+        .select(`
+          *,
+          departments(name),
+          sectors(name)
+        `);
+
+      if (!isAdmin) {
+        query = query
+          .eq("department_id", profile.department_id)
+          .eq("sector_id", profile.sector_id);
+      }
+
+      const { data: profilesData, error: profilesError } = await query;
+      if (profilesError) throw profilesError;
+
+      // Fetch levels
+      const { data: levelsData, error: levelsError } = await supabase
+        .from("competency_levels")
+        .select("*");
+      if (levelsError) throw levelsError;
+
+      // Map profiles to employees format
+      const mappedEmployees = (profilesData || []).map((p: any) => {
+        const userLevels = new Array(skills.length).fill(0);
+        levelsData?.forEach((l) => {
+          if (l.user_id === p.user_id) {
+            const skillIdx = skills.indexOf(l.skill_name);
+            if (skillIdx !== -1) {
+              userLevels[skillIdx] = l.level;
+            }
+          }
+        });
+
+        return {
+          id: p.id,
+          user_id: p.user_id,
+          name: p.name,
+          avatar_url: p.avatar_url,
+          role: p.role,
+          department: p.departments?.name || "N/A",
+          department_id: p.department_id,
+          levels: userLevels,
+        };
+      });
+
+      setEmployees(mappedEmployees);
+    } catch (error) {
+      console.error("Error fetching competency data:", error);
+      toast({
+        title: "Erro ao carregar dados",
+        description: "Não foi possível carregar a matriz de competências.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, [profile, isAdmin]);
+
+  const departments = [...new Set(allDepartments.map((d) => d.name))];
 
   const filteredEmployees = employees.filter(
     (e) => selectedDepartment === "all" || e.department === selectedDepartment
   );
 
   const avgLevels = skills.map((_, i) => {
-    const sum = employees.reduce((acc, emp) => acc + emp.levels[i], 0);
-    return (sum / employees.length).toFixed(1);
+    const activeEmployees = employees.filter(emp => emp.levels[i] > 0);
+    if (activeEmployees.length === 0) return "0.0";
+    const sum = activeEmployees.reduce((acc, emp) => acc + emp.levels[i], 0);
+    return (sum / activeEmployees.length).toFixed(1);
   });
 
   const gaps = skills
@@ -122,46 +204,69 @@ export default function Competencias() {
       avg: parseFloat(avgLevels[i]),
       gap: 4 - parseFloat(avgLevels[i]),
     }))
-    .filter((s) => s.gap > 0)
+    .filter((s) => s.gap > 0 && s.avg > 0)
     .sort((a, b) => b.gap - a.gap);
 
-  const updateCompetencyLevel = (empId: number, skillIdx: number, newLevel: number) => {
-    const employee = employees.find(e => e.id === empId);
+  const updateCompetencyLevel = async (userId: string, skillIdx: number, newLevel: number) => {
+    const employee = employees.find(e => e.user_id === userId);
     const skillName = skills[skillIdx];
-    setEmployees((prev) =>
-      prev.map((emp) =>
-        emp.id === empId
-          ? { ...emp, levels: emp.levels.map((l, i) => (i === skillIdx ? newLevel : l)) }
-          : emp
-      )
-    );
-    addNotification({
-      userName: profile?.name || "Usuário",
-      action: "EDITOU",
-      resource: "Competências",
-      details: `Alterou o nível da competência "${skillName}" de ${employee?.name} para ${newLevel}`,
+
+    try {
+      const { error } = await supabase
+        .from("competency_levels")
+        .upsert({
+          user_id: userId,
+          skill_name: skillName,
+          level: newLevel,
+          updated_at: new Date().toISOString(),
+        }, {
+          onConflict: 'user_id,skill_name'
+        });
+
+      if (error) throw error;
+
+      setEmployees((prev) =>
+        prev.map((emp) =>
+          emp.user_id === userId
+            ? { ...emp, levels: emp.levels.map((l, i) => (i === skillIdx ? newLevel : l)) }
+            : emp
+        )
+      );
+
+      toast({
+        title: "Nível atualizado",
+        description: `Competência "${skillName}" de ${employee?.name} atualizada para ${newLevel}.`,
+      });
+
+      addNotification({
+        user_name: profile?.name || "Usuário",
+        action: "EDITOU",
+        resource: "Competências",
+        details: `Alterou o nível da competência "${skillName}" de ${employee?.name} para ${newLevel}`,
+      });
+    } catch (error) {
+      console.error("Error updating competency:", error);
+      toast({
+        title: "Erro ao atualizar",
+        description: "Não foi possível salvar a alteração.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const deleteEmployee = async (empId: string) => {
+    // We don't delete profiles from here usually, but maybe we remove all their levels?
+    // User didn't request profile deletion. I'll just keep the function but maybe disable it or make it clear.
+    // For now, let's just make it do nothing or remove levels if it's supposed to "remove from matrix"
+    toast({
+      title: "Recurso não implementado",
+      description: "A exclusão de colaboradores deve ser feita na gestão de usuários.",
     });
   };
 
-  const deleteEmployee = (empId: number) => {
-    const employee = employees.find(e => e.id === empId);
-    setEmployees((prev) => prev.filter((emp) => emp.id !== empId));
-    addNotification({
-      userName: profile?.name || "Usuário",
-      action: "EXCLUIU",
-      resource: "Competências",
-      details: `Removeu o colaborador ${employee?.name} da matriz`,
-    });
-  };
-
-  const addEmployee = (employee: typeof initialEmployees[0]) => {
-    setEmployees((prev) => [...prev, employee]);
-    addNotification({
-      userName: profile?.name || "Usuário",
-      action: "CRIOU",
-      resource: "Competências",
-      details: `Adicionou o colaborador ${employee.name} à matriz`,
-    });
+  const addEmployee = (employee: any) => {
+    // Same here, users are added in admin/auth
+    fetchData();
   };
 
   return (
@@ -257,7 +362,12 @@ export default function Competencias() {
         </div>
 
         {/* Competency Matrix */}
-        <div className="stat-card overflow-x-auto">
+        <div className="stat-card overflow-x-auto relative">
+          {loading && (
+            <div className="absolute inset-0 bg-background/50 backdrop-blur-sm flex items-center justify-center z-10 rounded-lg">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+          )}
           <h3 className="text-lg font-semibold mb-4">Matriz de Competências</h3>
           <table className="w-full min-w-[800px]">
             <thead>
@@ -273,64 +383,85 @@ export default function Competencias() {
                     {skill}
                   </th>
                 ))}
-                <th className="p-3 text-xs text-muted-foreground font-medium text-center border-b border-border w-16">
-                  Ação
-                </th>
+                {(isAdmin || profile?.role === "gerente") && (
+                  <th className="p-3 text-xs text-muted-foreground font-medium text-center border-b border-border w-16">
+                    Ações
+                  </th>
+                )}
               </tr>
             </thead>
             <tbody>
               {filteredEmployees.map((employee) => (
-                <tr key={employee.id} className="hover:bg-secondary/30 group">
+                <tr key={employee.user_id} className="hover:bg-secondary/30 group">
                   <td className="p-3 border-b border-border">
-                    <div>
-                      <p className="font-medium">{employee.name}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {employee.role} • {employee.department}
-                      </p>
+                    <div className="flex items-center gap-3">
+                      <Avatar className="h-8 w-8">
+                        <AvatarImage src={employee.avatar_url || ""} />
+                        <AvatarFallback className="bg-primary/10 text-primary text-xs">
+                          {employee.name.substring(0, 2).toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div>
+                        <p className="font-medium text-sm">{employee.name}</p>
+                        <p className="text-[10px] text-muted-foreground line-clamp-1">
+                          {employee.role} • {employee.department}
+                        </p>
+                      </div>
                     </div>
                   </td>
-                  {employee.levels.map((level, i) => (
+                  {employee.levels.map((level: number, i: number) => (
                     <td key={i} className="p-3 text-center border-b border-border">
-                      <Select
-                        value={level.toString()}
-                        onValueChange={(v) => updateCompetencyLevel(employee.id, i, parseInt(v))}
-                      >
-                        <SelectTrigger className={cn(
-                          "w-10 h-10 rounded-full mx-auto",
-                          levelColors[level as keyof typeof levelColors]
+                      {isAdmin || profile?.role === "gerente" ? (
+                        <Select
+                          value={level.toString()}
+                          onValueChange={(v) => updateCompetencyLevel(employee.user_id, i, parseInt(v))}
+                        >
+                          <SelectTrigger className={cn(
+                            "w-8 h-8 rounded-full mx-auto border-none p-0 flex items-center justify-center font-bold text-xs transition-transform hover:scale-110",
+                            levelColors[level as keyof typeof levelColors] || "bg-secondary text-muted-foreground"
+                          )}>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {[1, 2, 3, 4, 5].map((n) => (
+                              <SelectItem key={n} value={n.toString()}>
+                                {n} - {levelLabels[n as keyof typeof levelLabels]}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <div className={cn(
+                          "w-8 h-8 rounded-full mx-auto flex items-center justify-center font-bold text-xs",
+                          levelColors[level as keyof typeof levelColors] || "bg-secondary text-muted-foreground"
                         )}>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {[1, 2, 3, 4, 5].map((n) => (
-                            <SelectItem key={n} value={n.toString()}>
-                              {n} - {levelLabels[n as keyof typeof levelLabels]}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                          {level || "-"}
+                        </div>
+                      )}
                     </td>
                   ))}
-                  <td className="p-3 text-center border-b border-border">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
-                      onClick={() => deleteEmployee(employee.id)}
-                    >
-                      <Trash2 className="h-4 w-4 text-destructive" />
-                    </Button>
-                  </td>
+                  {(isAdmin || profile?.role === "gerente") && (
+                    <td className="p-3 text-center border-b border-border">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
+                        onClick={() => deleteEmployee(employee.id)}
+                      >
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </td>
+                  )}
                 </tr>
               ))}
               <tr className="bg-secondary/20">
-                <td className="p-3 font-semibold">Média</td>
+                <td className="p-3 font-semibold text-sm">Média</td>
                 {avgLevels.map((avg, i) => (
-                  <td key={i} className="p-3 text-center font-medium text-primary">
+                  <td key={i} className="p-3 text-center font-bold text-primary text-sm">
                     {avg}
                   </td>
                 ))}
-                <td></td>
+                {(isAdmin || profile?.role === "gerente") && <td></td>}
               </tr>
             </tbody>
           </table>

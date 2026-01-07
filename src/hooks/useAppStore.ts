@@ -1,6 +1,6 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
+import { supabase } from "@/integrations/supabase/client";
 
-// Types
 // Types
 export interface KPI {
   id: string;
@@ -15,7 +15,6 @@ export interface KPI {
   history: { date: string; value: number }[];
 }
 
-// ... rest of interfaces ...
 export interface Training {
   id: string;
   title: string;
@@ -60,12 +59,12 @@ export interface Process {
 
 export interface ActionNotification {
   id: string;
-  userName: string;
+  user_name: string;
   action: "CRIOU" | "EDITOU" | "EXCLUIU";
   resource: string;
   details: string;
   timestamp: string;
-  read: boolean;
+  read_by_admins: string[]; // UUID array
 }
 
 // Initial Data
@@ -100,36 +99,6 @@ const initialTrainings: Training[] = [
     status: "completed",
     deadline: "01/02/2024",
   },
-  {
-    id: "4",
-    title: "Excel Avançado",
-    category: "Técnico",
-    participants: 25,
-    completed: 18,
-    duration: "10h",
-    status: "active",
-    deadline: "20/02/2024",
-  },
-  {
-    id: "5",
-    title: "Comunicação Efetiva",
-    category: "Desenvolvimento",
-    participants: 50,
-    completed: 0,
-    duration: "3h",
-    status: "pending",
-    deadline: "01/03/2024",
-  },
-  {
-    id: "6",
-    title: "Qualidade Total",
-    category: "Obrigatório",
-    participants: 60,
-    completed: 55,
-    duration: "5h",
-    status: "active",
-    deadline: "10/02/2024",
-  },
 ];
 
 const initialKPIs: KPI[] = [
@@ -150,40 +119,6 @@ const initialKPIs: KPI[] = [
       { date: "2024-03-04", value: 87 },
     ],
   },
-  {
-    id: "2",
-    name: "Índice de Qualidade",
-    category: "Qualidade",
-    current: 94,
-    target: 95,
-    previous: 91,
-    unit: "%",
-    trend: "up",
-    status: "on-track",
-    history: [
-      { date: "2024-03-01", value: 91 },
-      { date: "2024-03-02", value: 92 },
-      { date: "2024-03-03", value: 93 },
-      { date: "2024-03-04", value: 94 },
-    ],
-  },
-  {
-    id: "3",
-    name: "Tempo Médio de Entrega",
-    category: "Logística",
-    current: 2.8,
-    target: 2.5,
-    previous: 3.2,
-    unit: "dias",
-    trend: "down",
-    status: "at-risk",
-    history: [
-      { date: "2024-03-01", value: 3.2 },
-      { date: "2024-03-02", value: 3.1 },
-      { date: "2024-03-03", value: 2.9 },
-      { date: "2024-03-04", value: 2.8 },
-    ],
-  },
 ];
 
 // Singleton store with Persistence
@@ -200,8 +135,8 @@ const saveToStorage = (key: string, value: any) => {
 
 let trainings = loadFromStorage("trainings", initialTrainings);
 let kpis = loadFromStorage("kpis", initialKPIs);
-let okrs = loadFromStorage("okrs", []); // OKRs history not needed for now
-let notifications = loadFromStorage("notifications", []);
+let okrs = loadFromStorage("okrs", []);
+let notifications: ActionNotification[] = [];
 
 let listeners: (() => void)[] = [];
 
@@ -209,8 +144,24 @@ const notifyListeners = () => {
   saveToStorage("trainings", trainings);
   saveToStorage("kpis", kpis);
   saveToStorage("okrs", okrs);
-  saveToStorage("notifications", notifications);
   listeners.forEach((l) => l());
+};
+
+// Global fetching for notifications
+const fetchNotifications = async () => {
+  try {
+    const { data, error } = await supabase
+      .from("notifications")
+      .select("*")
+      .order("timestamp", { ascending: false })
+      .limit(50);
+
+    if (error) throw error;
+    notifications = data || [];
+    notifyListeners();
+  } catch (err) {
+    console.error("Error fetching notifications:", err);
+  }
 };
 
 export function useAppStore() {
@@ -220,15 +171,29 @@ export function useAppStore() {
     setTick((t) => t + 1);
   }, []);
 
-  // Subscribe to changes
-  useState(() => {
+  useEffect(() => {
     listeners.push(forceUpdate);
+    fetchNotifications();
+
+    // Subscribe to realtime notifications
+    const channel = supabase
+      .channel("global_notifications")
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "notifications" },
+        (payload) => {
+          notifications = [payload.new as ActionNotification, ...notifications].slice(0, 50);
+          notifyListeners();
+        }
+      )
+      .subscribe();
+
     return () => {
       listeners = listeners.filter((l) => l !== forceUpdate);
+      supabase.removeChannel(channel);
     };
-  });
+  }, [forceUpdate]);
 
-  // KPIs
   const addKPI = useCallback((kpi: Omit<KPI, "id">) => {
     const newKPI = {
       ...kpi,
@@ -257,7 +222,6 @@ export function useAppStore() {
           history.sort((a, b) => a.date.localeCompare(b.date));
         }
 
-        // Update current value to the latest recorded one
         const latest = history[history.length - 1].value;
         const previous = history.length > 1 ? history[history.length - 2].value : k.previous;
         const trend = latest > previous ? "up" : latest < previous ? "down" : "stable";
@@ -277,7 +241,6 @@ export function useAppStore() {
     notifyListeners();
   }, []);
 
-  // OKRs
   const addOKR = useCallback((okr: Omit<OKR, "id">) => {
     const newOKR = { ...okr, id: Date.now().toString() };
     okrs = [...okrs, newOKR];
@@ -294,27 +257,38 @@ export function useAppStore() {
     notifyListeners();
   }, []);
 
-  const addNotification = useCallback((notification: Omit<ActionNotification, "id" | "timestamp" | "read">) => {
-    const newNote: ActionNotification = {
-      ...notification,
-      id: Date.now().toString(),
-      timestamp: new Date().toISOString(),
-      read: false,
-    };
-    notifications = [newNote, ...notifications].slice(0, 50);
-    notifyListeners();
+  const addNotification = useCallback(async (notification: Omit<ActionNotification, "id" | "timestamp" | "read_by_admins">) => {
+    try {
+      const { error } = await supabase.from("notifications").insert({
+        user_name: notification.user_name,
+        action: notification.action,
+        resource: notification.resource,
+        details: notification.details,
+      });
+      if (error) throw error;
+      // Realtime listener will handle local update
+    } catch (err) {
+      console.error("Error adding notification:", err);
+    }
   }, []);
 
-  const markAllNotificationsAsRead = useCallback(() => {
-    notifications = notifications.map((n: ActionNotification) => ({ ...n, read: true }));
-    notifyListeners();
+  const markAllNotificationsAsRead = useCallback(async (adminId: string) => {
+    try {
+      // Logic for read_by_admins array in DB is more complex than a simple local read=true
+      // For now, let's keep it simple or implement the array update
+      const { error } = await supabase.rpc('mark_notifications_read', { admin_id: adminId });
+      if (error) throw error;
+      fetchNotifications();
+    } catch (err) {
+      console.error("Error marking as read:", err);
+    }
   }, []);
 
   return {
     trainings,
     kpis,
     okrs,
-    addTraining: (t: any) => { trainings = [...trainings, { ...t, id: Date.now().toString() }]; notifyListeners(); }, // Simplified for brevity
+    addTraining: (t: any) => { trainings = [...trainings, { ...t, id: Date.now().toString() }]; notifyListeners(); },
     updateTraining: (id: string, u: any) => { trainings = trainings.map(t => t.id === id ? { ...t, ...u } : t); notifyListeners(); },
     deleteTraining: (id: string) => { trainings = trainings.filter(t => t.id !== id); notifyListeners(); },
     addKPI,
@@ -327,6 +301,6 @@ export function useAppStore() {
     notifications,
     addNotification,
     markAllNotificationsAsRead,
+    refreshNotifications: fetchNotifications,
   };
 }
-

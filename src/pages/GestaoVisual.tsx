@@ -815,7 +815,7 @@ export default function GestaoVisual() {
                     <div
                       key={item.id}
                       className={cn(
-                        "stat-card p-3 hover:shadow-lg transition-all group border-l-4",
+                        "stat-card p-3 hover:shadow-lg transition-all group border border-border/50 border-l-4",
                         column.id === "todo" && "border-l-gray-400",
                         column.id === "doing" && "border-l-orange-500",
                         column.id === "done" && "border-l-green-500",
