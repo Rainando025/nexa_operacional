@@ -42,7 +42,8 @@ const statusConfig = {
 };
 
 export default function Treinamentos() {
-  const { trainings, addTraining, updateTraining, deleteTraining } = useAppStore();
+  const { profile } = useAuth();
+  const { trainings, addTraining, updateTraining, deleteTraining, addNotification } = useAppStore();
   const [searchQuery, setSearchQuery] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingTraining, setEditingTraining] = useState<Training | undefined>();
@@ -69,14 +70,33 @@ export default function Treinamentos() {
   const handleSubmit = (data: Omit<Training, "id">) => {
     if (editingTraining) {
       updateTraining(editingTraining.id, data);
+      addNotification({
+        userName: profile?.name || "Usuário",
+        action: "EDITOU",
+        resource: "Treinamento",
+        details: `Editou o treinamento: "${data.title}"`,
+      });
     } else {
       addTraining(data);
+      addNotification({
+        userName: profile?.name || "Usuário",
+        action: "CRIOU",
+        resource: "Treinamento",
+        details: `Criou um novo treinamento: "${data.title}"`,
+      });
     }
   };
 
   const handleDelete = () => {
     if (deletingId) {
+      const deletedTraining = trainings.find(t => t.id === deletingId);
       deleteTraining(deletingId);
+      addNotification({
+        userName: profile?.name || "Usuário",
+        action: "EXCLUIU",
+        resource: "Treinamento",
+        details: `Excluiu o treinamento: "${deletedTraining?.title || 'Desconhecido'}"`,
+      });
       setDeletingId(null);
     }
   };

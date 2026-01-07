@@ -96,7 +96,7 @@ export default function Auth() {
             className="h-20 mb-6 mx-auto object-contain"
           />
           <h1 className="text-4xl font-extrabold tracking-tight text-white mb-2">
-            Gestão <span className="text-primary">Operacional</span>
+            Gestão <span className="text-[#146464]">Operacional</span>
           </h1>
           <p className="text-blue-200/60 font-medium italic">
             o elo entre tempo e produtividade🕢
@@ -174,7 +174,11 @@ export default function Auth() {
                     )}
                   />
 
-                  <Button type="submit" className="w-full font-bold shadow-lg hover:shadow-primary/20 transition-all duration-300" disabled={isLoading}>
+                  <Button
+                    type="submit"
+                    className="w-full font-bold shadow-lg hover:shadow-[#146464]/20 transition-all duration-300 bg-[#146464] hover:bg-[#146464]/90 text-white"
+                    disabled={isLoading}
+                  >
                     {isLoading ? "Entrando..." : "Entrar"}
                   </Button>
                 </form>

@@ -17,6 +17,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
+import { useAppStore } from "@/hooks/useAppStore";
 import { cn } from "@/lib/utils";
 
 interface AgendaEvent {
@@ -31,7 +32,8 @@ interface AgendaEvent {
 
 export default function Agenda() {
   const { toast } = useToast();
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
+  const { addNotification } = useAppStore();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [events, setEvents] = useState<AgendaEvent[]>([]);
   const [loading, setLoading] = useState(true);
@@ -106,6 +108,13 @@ export default function Agenda() {
         description: "O evento foi adicionado à sua agenda.",
       });
 
+      addNotification({
+        userName: profile?.name || "Usuário",
+        action: "CRIOU",
+        resource: "Agenda",
+        details: `Criou um novo evento: "${eventTitle.trim()}" para o dia ${format(selectedDate, "dd/MM/yyyy")}`,
+      });
+
       setModalOpen(false);
       fetchEvents();
     } catch (error) {
@@ -129,9 +138,17 @@ export default function Agenda() {
 
       if (error) throw error;
 
+      const event = events.find(e => e.id === eventId);
       toast({
         title: "Evento removido",
         description: "O evento foi removido da sua agenda.",
+      });
+
+      addNotification({
+        userName: profile?.name || "Usuário",
+        action: "EXCLUIU",
+        resource: "Agenda",
+        details: `Removeu o evento: "${event?.title || "Desconhecido"}"`,
       });
 
       fetchEvents();

@@ -31,7 +31,8 @@ import {
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { ProcessModal } from "@/components/modals/ProcessModal";
-import { Process } from "@/hooks/useAppStore";
+import { Process, useAppStore } from "@/hooks/useAppStore";
+import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 
 const initialProcesses: Process[] = [
@@ -122,6 +123,8 @@ const riskConfig = {
 };
 
 export default function Processos() {
+  const { profile } = useAuth();
+  const { addNotification } = useAppStore();
   const [processes, setProcesses] = useState<Process[]>(initialProcesses);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -159,8 +162,15 @@ export default function Processos() {
   };
 
   const handleDelete = (id: string) => {
+    const process = processes.find(p => p.id === id);
     setProcesses((prev) => prev.filter((p) => p.id !== id));
     toast({ title: "Processo excluído com sucesso" });
+    addNotification({
+      userName: profile?.name || "Usuário",
+      action: "EXCLUIU",
+      resource: "Processo",
+      details: `Excluiu o processo: "${process?.name || id}"`,
+    });
   };
 
   const handleSave = (data: Omit<Process, "id" | "lastReview">) => {
@@ -169,14 +179,27 @@ export default function Processos() {
         prev.map((p) => (p.id === selectedProcess.id ? { ...p, ...data } : p))
       );
       toast({ title: "Processo atualizado com sucesso" });
+      addNotification({
+        userName: profile?.name || "Usuário",
+        action: "EDITOU",
+        resource: "Processo",
+        details: `Atualizou o processo: "${data.name}"`,
+      });
     } else {
+      const newId = `PRC-${String(processes.length + 1).padStart(3, "0")}`;
       const newProcess: Process = {
         ...data,
-        id: `PRC-${String(processes.length + 1).padStart(3, "0")}`,
+        id: newId,
         lastReview: "-",
       };
       setProcesses((prev) => [...prev, newProcess]);
       toast({ title: "Processo criado com sucesso" });
+      addNotification({
+        userName: profile?.name || "Usuário",
+        action: "CRIOU",
+        resource: "Processo",
+        details: `Criou um novo processo: "${data.name}" (ID: ${newId})`,
+      });
     }
   };
 
