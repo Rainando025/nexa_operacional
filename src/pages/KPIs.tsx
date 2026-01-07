@@ -77,7 +77,7 @@ const statusConfig = {
 const categories = ["Todos", "Operacional", "Qualidade", "Financeiro", "RH", "Logística", "Atendimento", "Manutenção"];
 
 export default function KPIs() {
-  const { profile } = useAuth();
+  const { profile, isAdmin } = useAuth();
   const { addNotification } = useAppStore();
   const [kpis, setKpis] = useState<KPI[]>([]);
   const [loading, setLoading] = useState(true);
@@ -98,13 +98,16 @@ export default function KPIs() {
 
   // Fetch KPIs from Supabase
   const fetchKPIs = async () => {
-    if (!profile?.department_id) return;
     setLoading(true);
     try {
-      const { data: kpisData, error: kpisError } = await supabase
-        .from("kpis")
-        .select("*")
-        .eq("department_id", profile.department_id);
+      // Admins veem todos os KPIs, outros usuários veem apenas do seu departamento
+      let query = supabase.from("kpis").select("*");
+
+      if (!isAdmin && profile?.department_id) {
+        query = query.eq("department_id", profile.department_id);
+      }
+
+      const { data: kpisData, error: kpisError } = await query;
 
       if (kpisError) throw kpisError;
 

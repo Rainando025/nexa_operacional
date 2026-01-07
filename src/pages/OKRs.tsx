@@ -65,7 +65,7 @@ const statusConfig = {
 };
 
 export default function OKRs() {
-  const { profile } = useAuth();
+  const { profile, isAdmin } = useAuth();
   const { addNotification } = useAppStore();
   const [okrs, setOkrs] = useState<OKR[]>([]);
   const [loading, setLoading] = useState(true);
@@ -75,13 +75,16 @@ export default function OKRs() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const fetchOKRs = async () => {
-    if (!profile?.department_id) return;
     setLoading(true);
     try {
-      const { data: okrsData, error: okrsError } = await supabase
-        .from("okrs")
-        .select("*")
-        .eq("department_id", profile.department_id);
+      // Admins veem todos os OKRs, outros usuários veem apenas do seu departamento
+      let query = supabase.from("okrs").select("*");
+
+      if (!isAdmin && profile?.department_id) {
+        query = query.eq("department_id", profile.department_id);
+      }
+
+      const { data: okrsData, error: okrsError } = await query;
 
       if (okrsError) throw okrsError;
 
