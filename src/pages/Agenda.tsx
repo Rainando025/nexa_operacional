@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback } from "react";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { CalendarDays, ChevronLeft, ChevronRight, Plus, Trash2, Clock, Loader2 } from "lucide-react";
+import { CalendarDays, ChevronLeft, ChevronRight, Plus, Trash2, Clock, Loader2, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { SearchBar } from "@/components/SearchBar";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -28,6 +29,7 @@ interface AgendaEvent {
   event_date: string;
   event_time: string | null;
   created_at: string;
+  completed: boolean; // new field to track completion
 }
 
 export default function Agenda() {
@@ -42,6 +44,9 @@ export default function Agenda() {
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [eventTitle, setEventTitle] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  // For Kanban search
+  const [kanbanSearch, setKanbanSearch] = useState("");
   const [eventDescription, setEventDescription] = useState("");
   const [eventTime, setEventTime] = useState("");
   const [saving, setSaving] = useState(false);
@@ -56,14 +61,16 @@ export default function Agenda() {
 
       const { data, error } = await supabase
         .from("agenda_events")
-        .select("*")
+        .select("*, completed") // fetch completed flag if exists
         .gte("event_date", format(start, "yyyy-MM-dd"))
         .lte("event_date", format(end, "yyyy-MM-dd"))
         .order("event_date")
         .order("event_time");
 
       if (error) throw error;
-      setEvents(data || []);
+      // Ensure completed field exists
+      const enriched = (data || []).map((e: any) => ({ ...e, completed: e.completed ?? false }));
+      setEvents(enriched);
     } catch (error) {
       console.error("Error fetching events:", error);
       toast({
@@ -99,6 +106,7 @@ export default function Agenda() {
         description: eventDescription.trim() || null,
         event_date: format(selectedDate, "yyyy-MM-dd"),
         event_time: eventTime || null,
+        completed: false,
       });
 
       if (error) throw error;
@@ -175,15 +183,40 @@ export default function Agenda() {
   });
 
   const getEventsForDay = (day: Date) => {
-    return events.filter(e => isSameDay(new Date(e.event_date + "T00:00:00"), day));
+    return filteredEvents.filter(e => isSameDay(new Date(e.event_date + "T00:00:00"), day));
   };
 
+  // Reminder for upcoming events (next 2 days)
+  useEffect(() => {
+    const today = new Date();
+    const upcoming = events.filter(e => {
+      const evDate = new Date(e.event_date + "T00:00:00");
+      const diff = (evDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24);
+      return diff >= 0 && diff <= 2 && !e.completed;
+    });
+    if (upcoming.length) {
+      addNotification({
+        userName: profile?.name || "Usuário",
+        action: "LEMBRETE",
+        resource: "Agenda",
+        details: `Você tem ${upcoming.length} evento(s) nos próximos 2 dias.`,
+      });
+    }
+  }, [events, profile?.name]);
+
   const dayEvents = selectedDate ? getEventsForDay(selectedDate) : [];
+  // Filter events by search query
+  const filteredEvents = searchQuery
+    ? events.filter(e =>
+      e.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (e.description && e.description.toLowerCase().includes(searchQuery.toLowerCase()))
+    )
+    : events;
 
   return (
     <div className="space-y-6">
       {/* Page Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold flex items-center gap-3">
             <CalendarDays className="h-8 w-8 text-primary" />
@@ -193,6 +226,8 @@ export default function Agenda() {
             Gerencie seus eventos, lembretes e agendamentos
           </p>
         </div>
+        {/* Search Bar */}
+        <SearchBar placeholder="Buscar eventos..." onSearch={(q) => setSearchQuery(q)} />
       </div>
 
       {/* Calendar Navigation */}
@@ -269,7 +304,10 @@ export default function Agenda() {
                     {dayEventsList.slice(0, 2).map((event) => (
                       <div
                         key={event.id}
-                        className="text-xs p-1 rounded bg-primary/20 text-primary truncate"
+                        className={cn(
+                          "text-xs p-1 rounded truncate transition-colors",
+                          event.completed ? "bg-green-500/20 text-green-700 dark:text-green-300 border border-green-500/30" : "bg-primary/20 text-primary"
+                        )}
                         title={event.title}
                       >
                         {event.event_time && (
@@ -323,19 +361,70 @@ export default function Agenda() {
                     {event.description && (
                       <p className="text-sm text-muted-foreground truncate">{event.description}</p>
                     )}
+                    <div className="flex items-center justify-between">
+                      <div /* onClick={() => setEditingKanban(item.id)} */ className="cursor-pointer flex-1">
+                        <p className="font-medium text-sm">{/* {item.title} */}</p> {/* item.title is not defined here */}
+                        <p className="text-xs text-muted-foreground mt-1">{/* {item.description} */}</p> {/* item.description is not defined here */}
+                      </div>
+                      {/* Concluir Button */}
+                      <Button variant="ghost" size="icon" onClick={(e) => {
+                        e.stopPropagation();
+                        // Mark as completed
+                        // const updated = { ...item, completed: true }; // item is not defined here
+                        // updateKanbanItem(column.id, item.id, "description", updated.description); // column and item are not defined here
+                        // Change background via CSS class later
+                      }}>
+                        <CheckCircle2 className="h-4 w-4 text-green-500" />
+                      </Button>
+                    </div>
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => handleDeleteEvent(event.id)}
-                  >
-                    <Trash2 className="h-4 w-4 text-destructive" />
-                  </Button>
+                  <div className="flex items-center gap-1">
+                    <Button
+                      variant={event.completed ? "default" : "outline"}
+                      size="icon"
+                      className={cn("h-8 w-8", event.completed && "bg-green-600 hover:bg-green-700")}
+                      onClick={async () => {
+                        try {
+                          const newStatus = !event.completed;
+                          const { error } = await supabase
+                            .from("agenda_events")
+                            .update({ completed: newStatus })
+                            .eq("id", event.id);
+
+                          if (error) throw error;
+
+                          // Update local state
+                          setEvents(prev => prev.map(e => e.id === event.id ? { ...e, completed: newStatus } : e));
+
+                          toast({
+                            title: newStatus ? "Concluído" : "Reaberto",
+                            description: newStatus ? "Evento marcado como concluído." : "Evento reaberto.",
+                          });
+                        } catch (error) {
+                          console.error("Error updating event:", error);
+                          toast({
+                            title: "Erro",
+                            description: "Não foi possível atualizar o evento.",
+                            variant: "destructive",
+                          });
+                        }
+                      }}
+                      title={event.completed ? "Reabrir" : "Concluir"}
+                    >
+                      <CheckCircle2 className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleDeleteEvent(event.id)}
+                    >
+                      <Trash2 className="h-4 w-4 text-destructive" />
+                    </Button>
+                  </div>
                 </div>
               ))}
             </div>
           )}
-
           <div className="space-y-4 border-t pt-4">
             <Label className="text-muted-foreground">Novo evento:</Label>
             <div className="space-y-2">

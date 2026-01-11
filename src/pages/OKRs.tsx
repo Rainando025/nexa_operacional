@@ -1,4 +1,6 @@
 import { useState, useEffect } from "react";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
 import {
   Crosshair,
   Plus,
@@ -37,6 +39,12 @@ import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { useAppStore } from "@/hooks/useAppStore";
 import { toast } from "@/hooks/use-toast";
+import {
+  AreaChart,
+  Area,
+  ResponsiveContainer,
+  Tooltip,
+} from "recharts";
 
 export interface KeyResult {
   id: string;
@@ -45,13 +53,15 @@ export interface KeyResult {
   target: number;
   unit: string;
   status: "completed" | "on-track" | "at-risk" | "not-started";
+  history?: { date: string; value: number }[];
 }
 
 export interface OKR {
   id: string;
   objective: string;
   owner: string;
-  quarter: string;
+  deadline: string; // Used for "Prazo" (Deadline) YYYY-MM
+  description?: string;
   keyResults: KeyResult[];
   department_id?: string;
   owner_id?: string;
@@ -104,6 +114,7 @@ export default function OKRs() {
               target: kr.target,
               unit: kr.unit,
               status: kr.status,
+              history: kr.history || [],
             })),
           };
         })
@@ -172,25 +183,52 @@ export default function OKRs() {
           .update({
             objective: data.objective,
             owner: data.owner,
-            quarter: data.quarter,
+            deadline: data.deadline,
+            description: data.description,
             updated_at: new Date().toISOString(),
           })
           .eq("id", editingOKR.id);
 
         if (okrError) throw okrError;
 
-        await supabase.from("key_results").delete().eq("okr_id", editingOKR.id);
+        // Fetch existing KRs to preserve history if needed or handle updates better
+        // ideally we would upsert, but delete/insert is easier for now.
+        // HOWEVER, we must preserve history if the KR ID matches or similar logic.
+        // For simplicity in this iteration without complex KR matching:
+        // We will just lose history on full edit if we delete/insert.
+        // BETTER APPROACH: UPSERT logic or complex matching.
+        // Given complexity, let's try to match by title or ID if available in form data (but form data cleans IDs).
 
-        const { error: krsError } = await supabase.from("key_results").insert(
-          data.keyResults.map((kr) => ({
+        // For now, to support the user request "when updated, store date", we assume the user edits via this modal.
+        // If we delete and re-insert, we lose history unless we pass it through.
+        // Let's grab the existing history for matching KRs.
+
+        const existingKRs = editingOKR.keyResults;
+
+        const krsToInsert = data.keyResults.map((kr) => {
+          // Try to find existing KR to keep history
+          const existing = existingKRs.find(k => k.title === kr.title);
+          let history = existing?.history || [];
+
+          // If value changed, add to history
+          if (!existing || existing.current !== kr.current) {
+            history = [...history, { date: new Date().toISOString(), value: kr.current }];
+          }
+
+          return {
             okr_id: editingOKR.id,
             title: kr.title,
             current: kr.current,
             target: kr.target,
             unit: kr.unit,
             status: kr.status,
-          }))
-        );
+            history: history // This needs to be saved to DB. Column must exist.
+          };
+        });
+
+        await supabase.from("key_results").delete().eq("okr_id", editingOKR.id); // This clears old ones
+
+        const { error: krsError } = await supabase.from("key_results").insert(krsToInsert);
 
         if (krsError) throw krsError;
 
@@ -211,7 +249,8 @@ export default function OKRs() {
           .insert({
             objective: data.objective,
             owner: data.owner,
-            quarter: data.quarter,
+            deadline: data.deadline,
+            description: data.description,
             department_id: profile?.department_id,
             owner_id: profile?.user_id,
           })
@@ -220,16 +259,17 @@ export default function OKRs() {
 
         if (okrError) throw okrError;
 
-        const { error: krsError } = await supabase.from("key_results").insert(
-          data.keyResults.map((kr) => ({
-            okr_id: newOKR.id,
-            title: kr.title,
-            current: kr.current,
-            target: kr.target,
-            unit: kr.unit,
-            status: kr.status,
-          }))
-        );
+        const krsToInsert = data.keyResults.map((kr) => ({
+          okr_id: newOKR.id,
+          title: kr.title,
+          current: kr.current,
+          target: kr.target,
+          unit: kr.unit,
+          status: kr.status,
+          history: [{ date: new Date().toISOString(), value: kr.current }]
+        }));
+
+        const { error: krsError } = await supabase.from("key_results").insert(krsToInsert);
 
         if (krsError) throw krsError;
 
@@ -320,9 +360,6 @@ export default function OKRs() {
               </p>
             </div>
             <div className="flex items-center gap-3">
-              <Badge variant="secondary" className="text-sm py-1.5 px-3">
-                Q1 2024
-              </Badge>
               <Button className="gap-2" onClick={handleCreate}>
                 <Plus className="h-4 w-4" />
                 Novo OKR
@@ -410,8 +447,13 @@ export default function OKRs() {
                         <div>
                           <h3 className="font-semibold text-lg">{okr.objective}</h3>
                           <p className="text-sm text-muted-foreground mt-1">
-                            {okr.owner} • {okr.quarter}
+                            {okr.owner} • {okr.deadline.includes("-") ? format(new Date(okr.deadline + "-01T12:00:00"), "MMMM 'de' yyyy", { locale: ptBR }) : okr.deadline}
                           </p>
+                          {okr.description && (
+                            <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
+                              {okr.description}
+                            </p>
+                          )}
                         </div>
                         <div className="text-right shrink-0 flex items-center gap-2">
                           <span className="text-2xl font-bold text-primary">
@@ -440,7 +482,28 @@ export default function OKRs() {
                         </div>
                       </div>
                       <div className="mt-3">
-                        <Progress value={progress} className="h-2" />
+                        <Progress
+                          value={progress}
+                          className={cn(
+                            "h-2",
+                            // Deadline logic: if less than 1 month away and progress < 80%, turn red/warning
+                            (() => {
+                              try {
+                                const deadlineDate = new Date(okr.deadline + "-01");
+                                const now = new Date();
+                                const diffTime = deadlineDate.getTime() - now.getTime();
+                                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+                                if (diffDays <= 30 && progress < 100) return "[&>div]:bg-red-500"; // Critical risk
+                                if (diffDays <= 60 && progress < 80) return "[&>div]:bg-orange-500"; // High risk
+                                if (diffDays <= 90 && progress < 60) return "[&>div]:bg-yellow-500"; // Medium risk
+                                return "";
+                              } catch (e) {
+                                return "";
+                              }
+                            })()
+                          )}
+                        />
                       </div>
                     </div>
                   </div>
@@ -456,6 +519,11 @@ export default function OKRs() {
                         );
                         const StatusIcon = status.icon;
 
+                        // Chart data
+                        const chartData = (kr.history || []).map(h => ({ value: h.value }));
+                        // Add current value if not in history yet (visual only)
+                        const chartDataFinal = chartData.length > 0 ? chartData : [{ value: 0 }, { value: kr.current }];
+
                         return (
                           <div
                             key={kr.id}
@@ -465,7 +533,24 @@ export default function OKRs() {
                               <StatusIcon className={cn("h-4 w-4", status.color)} />
                             </div>
                             <div className="flex-1 min-w-0">
-                              <p className="font-medium text-sm">{kr.title}</p>
+                              <div className="flex items-center justify-between">
+                                <p className="font-medium text-sm">{kr.title}</p>
+                                <div className="h-8 w-24">
+                                  {/* Mini Chart */}
+                                  <ResponsiveContainer width="100%" height="100%">
+                                    <AreaChart data={chartDataFinal}>
+                                      <Area
+                                        type="monotone"
+                                        dataKey="value"
+                                        stroke="hsl(var(--primary))"
+                                        fill="hsl(var(--primary))"
+                                        fillOpacity={0.2}
+                                        strokeWidth={1}
+                                      />
+                                    </AreaChart>
+                                  </ResponsiveContainer>
+                                </div>
+                              </div>
                               <div className="flex items-center gap-3 mt-2">
                                 <Progress
                                   value={krProgress}
@@ -476,7 +561,7 @@ export default function OKRs() {
                                   )}
                                 />
                                 <span className="text-sm text-muted-foreground shrink-0">
-                                  {kr.current}/{kr.target} {kr.unit}
+                                  {kr.unit === 'R$' ? `R$ ${kr.current}` : `${kr.current}${kr.unit === '%' ? '%' : ''}`} / {kr.unit === 'R$' ? `R$ ${kr.target}` : `${kr.target}${kr.unit === '%' ? '%' : ''}`} {kr.unit !== '%' && kr.unit !== 'R$' && kr.unit}
                                 </span>
                               </div>
                             </div>

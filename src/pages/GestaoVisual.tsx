@@ -1,27 +1,26 @@
 import { useState, useMemo } from "react";
+import { SearchBar } from "@/components/SearchBar";
 import {
   LayoutGrid,
   Table2,
   Target,
   Clock,
   BarChart3,
-  FileText,
   Plus,
-  Trash2,
-  AlertTriangle,
-  CheckCircle2,
-  Circle,
-  Edit,
-  Check,
-  X,
-  Share2,
-  Box,
-  MousePointer2,
-  Type,
-  Link,
-  Zap,
   ArrowLeft,
   ArrowRight,
+  Edit,
+  Trash2,
+  Check,
+  FileText,
+  AlertTriangle,
+  Lightbulb,
+  Share2,
+  Box,
+  Zap,
+  Circle,
+  Link,
+  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -70,6 +69,7 @@ interface KanbanItem {
   title: string;
   description: string;
   assignee?: string;
+  completed?: boolean;
 }
 
 interface KanbanColumn {
@@ -231,6 +231,7 @@ export default function GestaoVisual() {
   const [editingW5H2, setEditingW5H2] = useState<string | null>(null);
   const [editingPareto, setEditingPareto] = useState<string | null>(null);
   const [editingKanban, setEditingKanban] = useState<string | null>(null);
+  const [kanbanSearch, setKanbanSearch] = useState("");
 
   // Calculate Pareto percentages with memoization
   const paretoWithCalcs = useMemo(() => {
@@ -433,7 +434,7 @@ export default function GestaoVisual() {
     );
   };
 
-  const updateKanbanItem = (columnId: string, itemId: string, field: keyof KanbanItem, value: string) => {
+  const updateKanbanItem = (columnId: string, itemId: string, field: keyof KanbanItem, value: any) => {
     setKanbanData((prev) =>
       prev.map((col) =>
         col.id === columnId
@@ -742,27 +743,31 @@ export default function GestaoVisual() {
             Ferramentas visuais para gestão de processos e tomada de decisão
           </p>
         </div>
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogTrigger asChild>
-            <Button className="gap-2">
-              <Plus className="h-4 w-4" />
-              Adicionar Item
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>
-                Adicionar{" "}
-                {activeTab === "kanban" && "Tarefa"}
-                {activeTab === "gut" && "Problema GUT"}
-                {activeTab === "eisenhower" && "Tarefa Eisenhower"}
-                {activeTab === "5w2h" && "Plano 5W2H"}
-                {activeTab === "pareto" && "Causa Pareto"}
-              </DialogTitle>
-            </DialogHeader>
-            {renderAddDialog()}
-          </DialogContent>
-        </Dialog>
+        <div className="flex items-center gap-2">
+          <SearchBar placeholder="Buscar no Kanban..." onSearch={setKanbanSearch} />
+          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+            <DialogTrigger asChild>
+              <Button className="gap-2">
+                <Plus className="h-4 w-4" />
+                Adicionar Item
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>
+                  Adicionar{" "}
+                  {activeTab === "kanban" && "Tarefa"}
+                  {activeTab === "gut" && "Problema GUT"}
+                  {activeTab === "eisenhower" && "Tarefa Eisenhower"}
+                  {activeTab === "5w2h" && "Plano 5W2H"}
+                  {activeTab === "pareto" && "Causa Pareto"}
+                </DialogTitle>
+              </DialogHeader>
+              {renderAddDialog()}
+            </DialogContent>
+          </Dialog>
+        </div>
+
       </div>
 
       {/* Tabs */}
@@ -797,12 +802,18 @@ export default function GestaoVisual() {
         {/* Kanban */}
         <TabsContent value="kanban" className="space-y-4">
           <p className="text-sm text-muted-foreground">Edite o card e selecione o status (coluna)</p>
-          <div className="flex gap-4 overflow-x-auto pb-4">
+          <div className="flex gap-4 overflow-x-auto pb-4 h-[calc(100vh-250px)]">
+            <Button variant="outline" className="h-12 min-w-[50px] flex-shrink-0" onClick={() => {
+              const id = `col-${Date.now()}`;
+              setKanbanData(prev => [...prev, { id, title: "Nova Coluna", items: [] }]);
+            }}>
+              <Plus className="h-6 w-6" />
+            </Button>
             {kanbanData.map((column) => (
               <div
                 key={column.id}
                 className={cn(
-                  "flex-shrink-0 w-56 bg-secondary/30 rounded-lg p-3 space-y-3 border-t-4",
+                  "flex-shrink-0 w-[280px] flex flex-col bg-secondary/30 rounded-lg p-2 space-y-2 border-t-4 h-full",
                   column.id === "todo" && "border-t-gray-400",
                   column.id === "doing" && "border-t-orange-500",
                   column.id === "done" && "border-t-green-500"
@@ -812,8 +823,11 @@ export default function GestaoVisual() {
                   <h3 className="font-semibold">{column.title}</h3>
                   <Badge variant="secondary">{column.items.length}</Badge>
                 </div>
-                <div className="space-y-2">
-                  {column.items.map((item) => (
+                <div className="space-y-2 flex-1 overflow-y-auto pr-1">
+                  {column.items.filter(i =>
+                    i.title.toLowerCase().includes(kanbanSearch.toLowerCase()) ||
+                    i.description.toLowerCase().includes(kanbanSearch.toLowerCase())
+                  ).map((item) => (
                     <div
                       key={item.id}
                       className={cn(

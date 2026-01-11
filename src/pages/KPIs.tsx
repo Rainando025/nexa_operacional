@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { SearchBar } from "@/components/SearchBar";
 import {
   Target,
   Plus,
@@ -61,6 +62,7 @@ export interface KPI {
   category: string;
   current: number;
   target: number;
+  previous: number;
   unit: string;
   trend: "up" | "down" | "stable";
   status: "on-track" | "at-risk" | "off-track";
@@ -87,9 +89,11 @@ export default function KPIs() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [selectedKPI, setSelectedKPI] = useState<KPI | null>(null);
   const [newValue, setNewValue] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
 
   const filteredKPIs = kpis.filter(
-    (kpi) => selectedCategory === "Todos" || kpi.category === selectedCategory
+    (kpi) => (selectedCategory === "Todos" || kpi.category === selectedCategory) &&
+      (kpi.name.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
   const onTrackCount = kpis.filter((k) => k.status === "on-track").length;
@@ -165,6 +169,23 @@ export default function KPIs() {
       supabase.removeChannel(channel);
     };
   }, [profile?.department_id]);
+
+  // Reminder for KPIs not updated today
+  useEffect(() => {
+    const today = new Date().toISOString().split('T')[0];
+    const missingUpdates = kpis.filter(k => {
+      const hasToday = k.history.some(h => h.date.startsWith(today));
+      return !hasToday;
+    });
+    if (missingUpdates.length > 0) {
+      addNotification({
+        userName: profile?.name || "Usuário",
+        action: "LEMBRETE",
+        resource: "KPI",
+        details: `Você tem ${missingUpdates.length} KPI(s) sem registro hoje.`,
+      });
+    }
+  }, [kpis, profile?.name, addNotification]);
 
   const handleCreate = () => {
     setEditingKPI(undefined);
@@ -397,19 +418,22 @@ export default function KPIs() {
           </div>
 
           {/* Filters */}
-          <div className="flex items-center gap-4">
-            <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-              <SelectTrigger className="w-48 bg-secondary/50">
-                <SelectValue placeholder="Categoria" />
-              </SelectTrigger>
-              <SelectContent>
-                {categories.map((cat) => (
-                  <SelectItem key={cat} value={cat}>
-                    {cat}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <div className="flex flex-col sm:flex-row items-center gap-4 justify-between">
+            <div className="flex items-center gap-4">
+              <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+                <SelectTrigger className="w-48 bg-secondary/50">
+                  <SelectValue placeholder="Categoria" />
+                </SelectTrigger>
+                <SelectContent>
+                  {categories.map((cat) => (
+                    <SelectItem key={cat} value={cat}>
+                      {cat}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <SearchBar placeholder="Buscar KPIs..." onSearch={setSearchQuery} />
           </div>
 
           {/* KPI Cards */}

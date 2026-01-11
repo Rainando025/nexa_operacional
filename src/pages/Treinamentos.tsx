@@ -1,8 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { SearchBar } from "@/components/SearchBar";
 import {
   GraduationCap,
   Plus,
-  Search,
   Filter,
   MoreVertical,
   Users,
@@ -50,6 +50,27 @@ export default function Treinamentos() {
   const [editingTraining, setEditingTraining] = useState<Training | undefined>();
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [showArchived, setShowArchived] = useState(false);
+  // Reminder for upcoming deadlines
+  useEffect(() => {
+    const today = new Date();
+    const upcoming = trainings.filter(t => {
+      if (t.status === 'completed') return false;
+      // parse Date dd/mm/yyyy
+      const [day, month, year] = t.deadline.split('/').map(Number);
+      const deadlineDate = new Date(year, month - 1, day);
+      const diff = (deadlineDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24);
+      return diff >= 0 && diff <= 7;
+    });
+
+    if (upcoming.length > 0) {
+      addNotification({
+        userName: profile?.name || "Usuário",
+        action: "LEMBRETE",
+        resource: "Treinamentos",
+        details: `Existem ${upcoming.length} treinamento(s) com prazo vencendo em breve.`,
+      });
+    }
+  }, [trainings, profile?.name, addNotification]);
 
   const filteredTrainings = trainings.filter((t) =>
     t.title.toLowerCase().includes(searchQuery.toLowerCase())
@@ -168,16 +189,8 @@ export default function Treinamentos() {
       </div>
 
       {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-4">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Buscar treinamentos..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10 bg-secondary/50"
-          />
-        </div>
+      <div className="flex flex-col sm:flex-row gap-4 items-center">
+        <SearchBar placeholder="Buscar treinamentos..." onSearch={setSearchQuery} />
         <Button variant="outline" className="gap-2">
           <Filter className="h-4 w-4" />
           Filtros

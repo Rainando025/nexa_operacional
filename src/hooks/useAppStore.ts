@@ -33,13 +33,15 @@ export interface KeyResult {
   target: number;
   unit: string;
   status: "completed" | "on-track" | "at-risk" | "not-started";
+  history?: { date: string; value: number }[];
 }
 
 export interface OKR {
   id: string;
   objective: string;
   owner: string;
-  quarter: string;
+  deadline: string;
+  description?: string;
   keyResults: KeyResult[];
 }
 
@@ -60,7 +62,7 @@ export interface Process {
 export interface ActionNotification {
   id: string;
   user_name?: string;
-  action: "CRIOU" | "EDITOU" | "EXCLUIU";
+  action: "CRIOU" | "EDITOU" | "EXCLUIU" | "LEMBRETE";
   resource: string;
   details: string;
   timestamp: string;
@@ -155,7 +157,7 @@ const fetchNotifications = async () => {
     const { data, error } = await supabase
       .from("notifications")
       .select("*")
-      .order("timestamp", { ascending: false })
+      .order("created_at", { ascending: false })
       .limit(50);
 
     if (error) throw error;
@@ -190,25 +192,25 @@ export function useAppStore() {
     // Subscribe to realtime notifications
     const channel = supabase
       .channel("global_notifications")
-        .on(
-          "postgres_changes",
-          { event: "INSERT", schema: "public", table: "notifications" },
-          (payload) => {
-            const n = payload.new as any;
-            const mapped = {
-              id: n.id?.toString() || Date.now().toString(),
-              user_name: n.user_name || n.userName,
-              action: n.action,
-              resource: n.resource,
-              details: n.details,
-              timestamp: n.timestamp || n.created_at || new Date().toISOString(),
-              read: false,
-              read_by_admins: n.read_by_admins || [],
-            } as ActionNotification;
-            notifications = [mapped, ...notifications].slice(0, 50);
-            notifyListeners();
-          }
-        )
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "notifications" },
+        (payload) => {
+          const n = payload.new as any;
+          const mapped = {
+            id: n.id?.toString() || Date.now().toString(),
+            user_name: n.user_name || n.userName,
+            action: n.action,
+            resource: n.resource,
+            details: n.details,
+            timestamp: n.timestamp || n.created_at || new Date().toISOString(),
+            read: false,
+            read_by_admins: n.read_by_admins || [],
+          } as ActionNotification;
+          notifications = [mapped, ...notifications].slice(0, 50);
+          notifyListeners();
+        }
+      )
       .subscribe();
 
     return () => {

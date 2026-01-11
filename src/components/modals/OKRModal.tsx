@@ -39,7 +39,8 @@ const keyResultSchema = z.object({
 const okrSchema = z.object({
   objective: z.string().min(5, "Objetivo deve ter no mínimo 5 caracteres"),
   owner: z.string().min(2, "Responsável deve ter no mínimo 2 caracteres"),
-  quarter: z.string().min(1, "Selecione o trimestre"),
+  deadline: z.string().min(1, "Selecione o prazo"),
+  description: z.string().optional(),
   keyResults: z.array(keyResultSchema).min(1, "Adicione pelo menos 1 Key Result"),
 });
 
@@ -52,7 +53,7 @@ interface OKRModalProps {
   initialData?: OKR;
 }
 
-const quarters = ["Q1 2024", "Q2 2024", "Q3 2024", "Q4 2024", "Q1 2025"];
+
 
 export function OKRModal({
   open,
@@ -67,7 +68,8 @@ export function OKRModal({
     defaultValues: {
       objective: "",
       owner: "",
-      quarter: "Q1 2024",
+      deadline: new Date().toISOString().slice(0, 7),
+      description: "",
       keyResults: [{ title: "", current: 0, target: 100, unit: "%" }],
     },
   });
@@ -78,7 +80,8 @@ export function OKRModal({
         form.reset({
           objective: initialData.objective,
           owner: initialData.owner,
-          quarter: initialData.quarter,
+          deadline: initialData.deadline,
+          description: initialData.description,
           keyResults: initialData.keyResults.map((kr) => ({
             title: kr.title,
             current: kr.current,
@@ -90,7 +93,8 @@ export function OKRModal({
         form.reset({
           objective: "",
           owner: "",
-          quarter: "Q1 2024",
+          deadline: new Date().toISOString().slice(0, 7), // YYYY-MM
+          description: "",
           keyResults: [{ title: "", current: 0, target: 100, unit: "%" }],
         });
       }
@@ -125,7 +129,8 @@ export function OKRModal({
       const okrData: Omit<OKR, "id"> = {
         objective: data.objective,
         owner: data.owner,
-        quarter: data.quarter,
+        deadline: data.deadline,
+        description: data.description,
         keyResults,
       };
       onSubmit(okrData);
@@ -164,6 +169,20 @@ export function OKRModal({
               )}
             />
 
+            <FormField
+              control={form.control}
+              name="description"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Descrição (Opcional)</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Detalhes adicionais sobre este OKR" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
             <div className="grid grid-cols-2 gap-4">
               <FormField
                 control={form.control}
@@ -181,24 +200,13 @@ export function OKRModal({
 
               <FormField
                 control={form.control}
-                name="quarter"
+                name="deadline"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Trimestre</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecione" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {quarters.map((q) => (
-                          <SelectItem key={q} value={q}>
-                            {q}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <FormLabel>Prazo</FormLabel>
+                    <FormControl>
+                      <Input type="month" {...field} />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -283,10 +291,19 @@ export function OKRModal({
                       name={`keyResults.${index}.unit`}
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel className="text-xs">Unidade</FormLabel>
-                          <FormControl>
-                            <Input placeholder="%" {...field} />
-                          </FormControl>
+                          <FormLabel className="text-xs">Medida</FormLabel>
+                          <Select onValueChange={field.onChange} defaultValue={field.value}>
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Selecione" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="%">Porcentagem (%)</SelectItem>
+                              <SelectItem value="R$">Monetário (R$)</SelectItem>
+                              <SelectItem value="un">Numérico (un)</SelectItem>
+                            </SelectContent>
+                          </Select>
                           <FormMessage />
                         </FormItem>
                       )}
