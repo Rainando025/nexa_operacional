@@ -182,6 +182,14 @@ export default function Agenda() {
     return date;
   });
 
+  // Filter events by search query
+  const filteredEvents = searchQuery
+    ? events.filter(e =>
+      e.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      e.description?.toLowerCase().includes(searchQuery.toLowerCase())
+    )
+    : events;
+
   const getEventsForDay = (day: Date) => {
     return filteredEvents.filter(e => isSameDay(new Date(e.event_date + "T00:00:00"), day));
   };
@@ -205,13 +213,7 @@ export default function Agenda() {
   }, [events, profile?.name]);
 
   const dayEvents = selectedDate ? getEventsForDay(selectedDate) : [];
-  // Filter events by search query
-  const filteredEvents = searchQuery
-    ? events.filter(e =>
-      e.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (e.description && e.description.toLowerCase().includes(searchQuery.toLowerCase()))
-    )
-    : events;
+
 
   return (
     <div className="space-y-6">
