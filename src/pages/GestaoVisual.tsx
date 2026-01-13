@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { SearchBar } from "@/components/SearchBar";
 import {
   LayoutGrid,
@@ -45,6 +45,7 @@ import { cn } from "@/lib/utils";
 import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { useAppStore } from "@/hooks/useAppStore";
+import { useGestaoVisual, TABLES } from "@/hooks/useGestaoVisual";
 import {
   BarChart,
   Bar,
@@ -127,92 +128,49 @@ interface FlowEdge {
   label?: string;
 }
 
-// Initial data
-const initialKanban: KanbanColumn[] = [
-  {
-    id: "todo",
-    title: "A Fazer",
-    items: [
-      { id: "k1", title: "Revisar processo de compras", description: "Análise completa do fluxo atual" },
-      { id: "k2", title: "Treinar equipe em 5S", description: "Capacitação para nova metodologia" },
-      { id: "k3", title: "Mapear desperdícios", description: "Identificar gargalos na produção" },
-    ],
-  },
-  {
-    id: "doing",
-    title: "Fazendo",
-    items: [
-      { id: "k4", title: "Implementar Kanban físico", description: "Instalar quadros na fábrica", assignee: "João" },
-    ],
-  },
-  {
-    id: "done",
-    title: "Feito",
-    items: [
-      { id: "k5", title: "Atualizar procedimentos", description: "Documentar novos processos" },
-      { id: "k6", title: "Análise de indicadores", description: "Relatório mensal completo" },
-    ],
-  },
-];
-
-const initialGUT: GUTItem[] = [
-  { id: "g1", problem: "Alto índice de retrabalho na linha A", gravity: 5, urgency: 5, trend: 4, score: 100 },
-  { id: "g2", problem: "Atraso nas entregas de fornecedores", gravity: 4, urgency: 5, trend: 3, score: 60 },
-  { id: "g3", problem: "Falta de treinamento em qualidade", gravity: 3, urgency: 3, trend: 4, score: 36 },
-  { id: "g4", problem: "Sistema de gestão desatualizado", gravity: 4, urgency: 3, trend: 5, score: 60 },
-  { id: "g5", problem: "Comunicação interna deficiente", gravity: 3, urgency: 4, trend: 3, score: 36 },
-];
-
-const initialEisenhower: EisenhowerItem[] = [
-  { id: "e1", task: "Resolver reclamação urgente do cliente", quadrant: "do" },
-  { id: "e2", task: "Planejamento estratégico anual", quadrant: "schedule" },
-  { id: "e3", task: "Responder emails de rotina", quadrant: "delegate" },
-  { id: "e4", task: "Reuniões sem pauta definida", quadrant: "eliminate" },
-  { id: "e5", task: "Treinamento de equipe", quadrant: "schedule" },
-  { id: "e6", task: "Auditoria de emergência", quadrant: "do" },
-];
-
-const initialW5H2: W5H2Item[] = [
-  {
-    id: "w1",
-    what: "Implementar sistema de gestão de qualidade",
-    why: "Reduzir defeitos e melhorar satisfação do cliente",
-    where: "Linha de produção A e B",
-    when: "Q1 2024",
-    who: "Equipe de Qualidade",
-    how: "Treinamento + novas ferramentas de inspeção",
-    howMuch: "R$ 50.000",
-  },
-  {
-    id: "w2",
-    what: "Automatizar processo de pedidos",
-    why: "Eliminar erros manuais e acelerar processamento",
-    where: "Departamento Comercial",
-    when: "Março 2024",
-    who: "TI + Vendas",
-    how: "Implementação de ERP integrado",
-    howMuch: "R$ 120.000",
-  },
-];
-
-const initialPareto: ParetoItem[] = [
-  { id: "p1", cause: "Falha de máquina", frequency: 45 },
-  { id: "p2", cause: "Erro de operador", frequency: 30 },
-  { id: "p3", cause: "Material defeituoso", frequency: 15 },
-  { id: "p4", cause: "Falta de treinamento", frequency: 7 },
-  { id: "p5", cause: "Outros", frequency: 3 },
-];
-
-
 export default function GestaoVisual() {
   const { profile } = useAuth();
   const { addNotification } = useAppStore();
+  const {
+    kanbanItems: dbKanbanItems,
+    gutItems: dbGutItems,
+    eisenhowerItems: dbEisenhowerItems,
+    w5h2Items: dbW5H2Items,
+    paretoItems: dbParetoItems,
+    createItem,
+    updateItem,
+    deleteItem
+  } = useGestaoVisual();
+
   const [activeTab, setActiveTab] = useState("kanban");
-  const [kanbanData, setKanbanData] = useState<KanbanColumn[]>(initialKanban);
-  const [gutData, setGutData] = useState<GUTItem[]>(initialGUT);
-  const [eisenhowerData, setEisenhowerData] = useState<EisenhowerItem[]>(initialEisenhower);
-  const [w5h2Data, setW5H2Data] = useState<W5H2Item[]>(initialW5H2);
-  const [paretoData, setParetoData] = useState<ParetoItem[]>(initialPareto);
+
+  // Transform DB items to Columns
+  const kanbanData = useMemo(() => {
+    const columns: KanbanColumn[] = [
+      { id: "todo", title: "A Fazer", items: [] },
+      { id: "doing", title: "Fazendo", items: [] },
+      { id: "done", title: "Feito", items: [] },
+    ];
+
+    dbKanbanItems.forEach(item => {
+      const col = columns.find(c => c.id === item.column_id);
+      if (col) {
+        col.items.push({
+          id: item.id,
+          title: item.title,
+          description: item.description,
+        });
+      }
+    });
+
+    return columns;
+  }, [dbKanbanItems]);
+
+  const gutData = dbGutItems as GUTItem[];
+  const eisenhowerData = dbEisenhowerItems as EisenhowerItem[];
+  const w5h2Data = useMemo(() => dbW5H2Items.map(item => ({ ...item, howMuch: item.how_much, where: item.where || item['"where"'] })), [dbW5H2Items]);
+  const paretoData = dbParetoItems as ParetoItem[];
+
   const [nodes, setNodes] = useState<FlowNode[]>([]);
   const [edges, setEdges] = useState<FlowEdge[]>([]);
   const [zoom, setZoom] = useState(1);
@@ -240,7 +198,7 @@ export default function GestaoVisual() {
     return [...paretoData]
       .sort((a, b) => b.frequency - a.frequency)
       .map((item) => {
-        const percentage = (item.frequency / total) * 100;
+        const percentage = total === 0 ? 0 : (item.frequency / total) * 100;
         cumulative += percentage;
         return { ...item, percentage, cumulative };
       });
@@ -251,232 +209,180 @@ export default function GestaoVisual() {
     return [...gutData].sort((a, b) => b.score - a.score);
   }, [gutData]);
 
-  // Add functions
-  const addKanbanItem = () => {
-    const newItem: KanbanItem = {
-      id: `k${Date.now()}`,
+  // Add functions (DB)
+  const addKanbanItem = async () => {
+    await createItem(TABLES.KANBAN, {
       title: newKanbanItem.title,
       description: newKanbanItem.description,
-    };
-    setKanbanData((prev) =>
-      prev.map((col) =>
-        col.id === newKanbanItem.columnId ? { ...col, items: [...col.items, newItem] } : col
-      )
-    );
+      column_id: newKanbanItem.columnId,
+    });
+
     addNotification({
       userName: profile?.name || "Usuário",
       action: "CRIOU",
       resource: "Kanban",
-      details: `Criou uma nova tarefa: "${newItem.title}"`,
+      details: `Criou uma nova tarefa: "${newKanbanItem.title}"`,
     });
     setNewKanbanItem({ title: "", description: "", columnId: "todo" });
     setDialogOpen(false);
   };
 
-  const addGutItem = () => {
-    const score = newGutItem.gravity * newGutItem.urgency * newGutItem.trend;
-    const newItem: GUTItem = {
-      id: `g${Date.now()}`,
-      ...newGutItem,
-      score,
-    };
-    setGutData((prev) => [...prev, newItem].sort((a, b) => b.score - a.score));
+  const addGutItem = async () => {
+    await createItem(TABLES.GUT, {
+      problem: newGutItem.problem,
+      gravity: newGutItem.gravity,
+      urgency: newGutItem.urgency,
+      trend: newGutItem.trend
+    });
+
     addNotification({
       userName: profile?.name || "Usuário",
       action: "CRIOU",
       resource: "Matriz GUT",
-      details: `Adicionou um problema à Matriz GUT: "${newItem.problem}"`,
+      details: `Adicionou um problema à Matriz GUT: "${newGutItem.problem}"`,
     });
     setNewGutItem({ problem: "", gravity: 3, urgency: 3, trend: 3 });
     setDialogOpen(false);
   };
 
-  const addEisenhowerItem = () => {
-    const newItem: EisenhowerItem = {
-      id: `e${Date.now()}`,
+  const addEisenhowerItem = async () => {
+    await createItem(TABLES.EISENHOWER, {
       task: newEisenhowerItem.task,
-      quadrant: newEisenhowerItem.quadrant,
-    };
-    setEisenhowerData((prev) => [...prev, newItem]);
+      quadrant: newEisenhowerItem.quadrant
+    });
+
     addNotification({
       userName: profile?.name || "Usuário",
       action: "CRIOU",
       resource: "Eisenhower",
-      details: `Adicionou uma tarefa à Matriz Eisenhower: "${newItem.task}"`,
+      details: `Adicionou uma tarefa à Matriz Eisenhower: "${newEisenhowerItem.task}"`,
     });
     setNewEisenhowerItem({ task: "", quadrant: "do" });
     setDialogOpen(false);
   };
 
-  const addW5H2Item = () => {
-    const newItem: W5H2Item = {
-      id: `w${Date.now()}`,
-      ...newW5H2Item,
-    };
-    setW5H2Data((prev) => [...prev, newItem]);
+  const addW5H2Item = async () => {
+    await createItem(TABLES.W5H2, {
+      what: newW5H2Item.what,
+      why: newW5H2Item.why,
+      where: newW5H2Item.where,
+      when: newW5H2Item.when,
+      who: newW5H2Item.who,
+      how: newW5H2Item.how,
+      how_much: newW5H2Item.howMuch
+    });
+
     addNotification({
       userName: profile?.name || "Usuário",
       action: "CRIOU",
       resource: "W5H2",
-      details: `Adicionou um plano de ação (W5H2): "${newItem.what}"`,
+      details: `Adicionou um plano de ação (W5H2): "${newW5H2Item.what}"`,
     });
     setNewW5H2Item({ what: "", why: "", where: "", when: "", who: "", how: "", howMuch: "" });
     setDialogOpen(false);
   };
 
-  const addParetoItem = () => {
-    const newItem: ParetoItem = {
-      id: `p${Date.now()}`,
+  const addParetoItem = async () => {
+    await createItem(TABLES.PARETO, {
       cause: newParetoItem.cause,
-      frequency: newParetoItem.frequency,
-    };
-    setParetoData((prev) => [...prev, newItem]);
+      frequency: newParetoItem.frequency
+    });
+
     addNotification({
       userName: profile?.name || "Usuário",
       action: "CRIOU",
       resource: "Pareto",
-      details: `Adicionou uma causa ao Diagrama de Pareto: "${newItem.cause}"`,
+      details: `Adicionou uma causa ao Diagrama de Pareto: "${newParetoItem.cause}"`,
     });
     setNewParetoItem({ cause: "", frequency: 0 });
     setDialogOpen(false);
   };
 
-  // Delete functions
-  const deleteKanbanItem = (columnId: string, itemId: string) => {
-    const column = kanbanData.find(c => c.id === columnId);
-    const item = column?.items.find(i => i.id === itemId);
-    setKanbanData((prev) =>
-      prev.map((col) =>
-        col.id === columnId ? { ...col, items: col.items.filter((item) => item.id !== itemId) } : col
-      )
-    );
+  // Delete functions (DB)
+  const deleteKanbanItem = async (columnId: string, itemId: string) => {
+    await deleteItem(TABLES.KANBAN, itemId);
+    // Notification for delete
     addNotification({
       userName: profile?.name || "Usuário",
       action: "EXCLUIU",
       resource: "Kanban",
-      details: `Excluiu a tarefa: "${item?.title || "Desconhecida"}"`,
+      details: `Excluiu uma tarefa do Kanban`,
     });
   };
 
-  const deleteGutItem = (id: string) => {
-    const item = gutData.find(i => i.id === id);
-    setGutData((prev) => prev.filter((item) => item.id !== id));
+  const deleteGutItem = async (id: string) => {
+    await deleteItem(TABLES.GUT, id);
     addNotification({
       userName: profile?.name || "Usuário",
       action: "EXCLUIU",
       resource: "Matriz GUT",
-      details: `Excluiu o problema: "${item?.problem || "Desconhecido"}"`,
+      details: `Excluiu um problema da Matriz GUT`,
     });
   };
 
-  const deleteEisenhowerItem = (id: string) => {
-    const item = eisenhowerData.find(i => i.id === id);
-    setEisenhowerData((prev) => prev.filter((item) => item.id !== id));
+  const deleteEisenhowerItem = async (id: string) => {
+    await deleteItem(TABLES.EISENHOWER, id);
     addNotification({
       userName: profile?.name || "Usuário",
       action: "EXCLUIU",
       resource: "Eisenhower",
-      details: `Excluiu a tarefa: "${item?.task || "Desconhecida"}"`,
+      details: `Excluiu uma tarefa da matriz Eisenhower`,
     });
   };
 
-  const deleteW5H2Item = (id: string) => {
-    const item = w5h2Data.find(i => i.id === id);
-    setW5H2Data((prev) => prev.filter((item) => item.id !== id));
+  const deleteW5H2Item = async (id: string) => {
+    await deleteItem(TABLES.W5H2, id);
     addNotification({
       userName: profile?.name || "Usuário",
       action: "EXCLUIU",
       resource: "W5H2",
-      details: `Excluiu o plano de ação: "${item?.what || "Desconhecido"}"`,
+      details: `Excluiu um item do 5W2H`,
     });
   };
 
-  const deleteParetoItem = (id: string) => {
-    const item = paretoData.find(i => i.id === id);
-    setParetoData((prev) => prev.filter((item) => item.id !== id));
+  const deleteParetoItem = async (id: string) => {
+    await deleteItem(TABLES.PARETO, id);
     addNotification({
       userName: profile?.name || "Usuário",
       action: "EXCLUIU",
       resource: "Pareto",
-      details: `Excluiu a causa: "${item?.cause || "Desconhecida"}"`,
+      details: `Excluiu um item do Pareto`,
     });
   };
 
-  // Update functions
-  const updateGutItem = (id: string, field: keyof GUTItem, value: number | string) => {
-    setGutData((prev) =>
-      prev.map((item) => {
-        if (item.id !== id) return item;
-        const updated = { ...item, [field]: value };
-        if (field === "gravity" || field === "urgency" || field === "trend") {
-          updated.score = updated.gravity * updated.urgency * updated.trend;
-        }
-        return updated;
-      }).sort((a, b) => b.score - a.score)
-    );
+  // Update functions (DB)
+  const updateGutItem = async (id: string, field: keyof GUTItem, value: number | string) => {
+    // If updating factors, score is calculated in DB, but we pass raw values
+    await updateItem(TABLES.GUT, id, { [field]: value });
   };
 
-  const updateEisenhowerItem = (id: string, task: string) => {
-    setEisenhowerData((prev) =>
-      prev.map((item) => (item.id === id ? { ...item, task } : item))
-    );
+  const updateEisenhowerItem = async (id: string, task: string) => {
+    await updateItem(TABLES.EISENHOWER, id, { task });
   };
 
-  const updateW5H2Item = (id: string, field: keyof W5H2Item, value: string) => {
-    setW5H2Data((prev) =>
-      prev.map((item) => (item.id === id ? { ...item, [field]: value } : item))
-    );
+  const updateW5H2Item = async (id: string, field: keyof W5H2Item, value: string) => {
+    const dbField = field === "howMuch" ? "how_much" : field;
+    await updateItem(TABLES.W5H2, id, { [dbField]: value });
   };
 
-  const updateParetoItem = (id: string, field: "cause" | "frequency", value: string | number) => {
-    setParetoData((prev) =>
-      prev.map((item) => (item.id === id ? { ...item, [field]: value } : item))
-    );
+  const updateParetoItem = async (id: string, field: "cause" | "frequency", value: string | number) => {
+    await updateItem(TABLES.PARETO, id, { [field]: value });
   };
 
-  const updateKanbanItem = (columnId: string, itemId: string, field: keyof KanbanItem, value: any) => {
-    setKanbanData((prev) =>
-      prev.map((col) =>
-        col.id === columnId
-          ? {
-            ...col,
-            items: col.items.map((item) =>
-              item.id === itemId ? { ...item, [field]: value } : item
-            ),
-          }
-          : col
-      )
-    );
+  const updateKanbanItem = async (columnId: string, itemId: string, field: keyof KanbanItem, value: any) => {
+    await updateItem(TABLES.KANBAN, itemId, { [field]: value });
   };
 
-  // Move Kanban item between columns (status)
-  const moveKanbanItem = (itemId: string, fromColumn: string, toColumn: string) => {
+  // Move Kanban item between columns
+  const moveKanbanItem = async (itemId: string, fromColumn: string, toColumn: string) => {
     if (fromColumn === toColumn) return;
+    await updateItem(TABLES.KANBAN, itemId, { column_id: toColumn });
 
-    const item = kanbanData
-      .find((col) => col.id === fromColumn)
-      ?.items.find((i) => i.id === itemId);
-
-    if (!item) return;
-
-    setKanbanData((prev) =>
-      prev.map((col) => {
-        if (col.id === fromColumn) {
-          return { ...col, items: col.items.filter((i) => i.id !== itemId) };
-        }
-        if (col.id === toColumn) {
-          return { ...col, items: [...col.items, item] };
-        }
-        return col;
-      })
-    );
-
-    const targetCol = kanbanData.find((c) => c.id === toColumn);
     addNotification({
       userName: profile?.name || "Usuário",
       action: "EDITOU",
       resource: "Kanban",
-      details: `Moveu a tarefa "${item.title}" para "${targetCol?.title || toColumn}"`,
+      details: `Moveu uma tarefa no Kanban`,
     });
   };
 

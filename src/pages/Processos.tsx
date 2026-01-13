@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { supabase } from "@/integrations/supabase/client";
 import {
   GitBranch,
   Plus,
@@ -123,7 +124,7 @@ const riskConfig = {
 };
 
 export default function Processos() {
-  const { profile } = useAuth();
+  const { profile, isAdmin, isManager } = useAuth();
   const { addNotification } = useAppStore();
   const [processes, setProcesses] = useState<Process[]>(initialProcesses);
   const [searchQuery, setSearchQuery] = useState("");
@@ -133,10 +134,37 @@ export default function Processos() {
   const [viewOnly, setViewOnly] = useState(false);
   const { toast } = useToast();
 
+  // Access Control: User's Department Name
+  const [userDepartmentName, setUserDepartmentName] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchUserDepartment = async () => {
+      if (!profile?.department_id) return;
+
+      const { data, error } = await supabase
+        .from("departments")
+        .select("name")
+        .eq("id", profile.department_id)
+        .single();
+
+      if (!error && data) {
+        setUserDepartmentName(data.name);
+      }
+    };
+
+    fetchUserDepartment();
+  }, [profile?.department_id]);
+
   const filteredProcesses = processes.filter((p) => {
     const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesStatus = statusFilter === "all" || p.status === statusFilter;
-    return matchesSearch && matchesStatus;
+
+    // Permission Filter: Admins/Managers see all, Others see only their department
+    const matchesDepartment = (isAdmin || isManager)
+      ? true
+      : p.department === userDepartmentName;
+
+    return matchesSearch && matchesStatus && matchesDepartment;
   });
 
   const activeCount = processes.filter((p) => p.status === "active").length;
