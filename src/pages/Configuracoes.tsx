@@ -171,26 +171,42 @@ export default function Configuracoes() {
     }
 
     setCreatingUser(true);
+    setCreatingUser(true);
     try {
-      const { data: sessionData } = await supabase.auth.getSession();
+      console.log("Iniciando criação de usuário...");
 
-      const response = await supabase.functions.invoke("create-user", {
-        body: {
+      // Force refresh session to ensure valid JWT
+      const { data: { session }, error: sessionError } = await supabase.auth.refreshSession();
+
+      if (sessionError || !session) {
+        console.error("Session refresh error:", sessionError);
+        throw new Error("Sessão inválida. Por favor, faça login novamente.");
+      }
+
+      console.log("Session refreshed. Token length:", session.access_token.length);
+
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-user`, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${session.access_token}`,
+          "apikey": import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
           email: newUserEmail.trim(),
           password: newUserPassword,
           name: newUserName.trim(),
           role: newUserRole,
           department_id: newUserDept || null,
           sector_id: newUserSector || null,
-        },
+        }),
       });
 
-      if (response.error) {
-        throw new Error(response.error.message);
-      }
+      const responseData = await response.json().catch(() => ({}));
 
-      if (response.data?.error) {
-        throw new Error(response.data.error);
+      if (!response.ok) {
+        console.error("Edge Function Error:", response.status, responseData);
+        throw new Error(responseData.error || responseData.message || `Erro ${response.status}: ${JSON.stringify(responseData)}`);
       }
 
       toast({
