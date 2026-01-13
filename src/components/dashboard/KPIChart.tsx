@@ -7,20 +7,86 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
-
-const data = [
-  { name: "Jan", produtividade: 65, qualidade: 78, eficiencia: 72 },
-  { name: "Fev", produtividade: 72, qualidade: 82, eficiencia: 75 },
-  { name: "Mar", produtividade: 78, qualidade: 80, eficiencia: 79 },
-  { name: "Abr", produtividade: 74, qualidade: 85, eficiencia: 82 },
-  { name: "Mai", produtividade: 82, qualidade: 88, eficiencia: 85 },
-  { name: "Jun", produtividade: 88, qualidade: 90, eficiencia: 89 },
-];
+import { useKPIs } from "@/hooks/useKPIs";
+import { useMemo } from "react";
+import { format, parseISO, startOfMonth } from "date-fns";
+import { ptBR } from "date-fns/locale";
 
 export function KPIChart() {
+  const { kpis } = useKPIs();
+
+  const data = useMemo(() => {
+    if (!kpis.length) return [];
+
+    // 1. Collect all unique months from history across all KPIs
+    const monthMap = new Map<string, {
+      name: string;
+      produtividade: number[];
+      qualidade: number[];
+      eficiencia: number[];
+      date: number
+    }>();
+
+    // Initialize with last 6 months to ensure chart looks good even with empty data
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date();
+      d.setMonth(d.getMonth() - i);
+      const key = format(d, "yyyy-MM");
+      monthMap.set(key, {
+        name: format(d, "MMM", { locale: ptBR }),
+        produtividade: [],
+        qualidade: [],
+        eficiencia: [],
+        date: d.getTime()
+      });
+    }
+
+    kpis.forEach(kpi => {
+      kpi.history.forEach(h => {
+        const date = parseISO(h.date);
+        const key = format(date, "yyyy-MM");
+
+        if (!monthMap.has(key)) {
+          monthMap.set(key, {
+            name: format(date, "MMM", { locale: ptBR }),
+            produtividade: [],
+            qualidade: [],
+            eficiencia: [],
+            date: date.getTime()
+          });
+        }
+
+        const entry = monthMap.get(key)!;
+        const progress = (h.value / kpi.target) * 100;
+
+        // Map categories to chart lines
+        if (kpi.category === "Operacional") {
+          entry.produtividade.push(progress);
+        } else if (kpi.category === "Qualidade") {
+          entry.qualidade.push(progress);
+        }
+
+        // Eficiencia (Average of all)
+        entry.eficiencia.push(progress);
+      });
+    });
+
+    // Calculate averages and sort by date
+    return Array.from(monthMap.values())
+      .sort((a, b) => a.date - b.date)
+      .slice(-6) // Keep last 6 months
+      .map(entry => ({
+        name: entry.name,
+        produtividade: entry.produtividade.length ? entry.produtividade.reduce((a, b) => a + b, 0) / entry.produtividade.length : 0,
+        qualidade: entry.qualidade.length ? entry.qualidade.reduce((a, b) => a + b, 0) / entry.qualidade.length : 0,
+        eficiencia: entry.eficiencia.length ? entry.eficiencia.reduce((a, b) => a + b, 0) / entry.eficiencia.length : 0,
+      }));
+
+  }, [kpis]);
+
   return (
     <div className="stat-card h-[350px]">
-      <h3 className="text-lg font-semibold mb-4">Evolução dos KPIs</h3>
+      <h3 className="text-lg font-semibold mb-4">Evolução dos KPIs (Média % da Meta)</h3>
       <ResponsiveContainer width="100%" height="85%">
         <AreaChart data={data}>
           <defs>
@@ -59,11 +125,12 @@ export function KPIChart() {
               borderRadius: "8px",
               color: "hsl(210, 40%, 98%)",
             }}
+            formatter={(value: number) => [value.toFixed(1) + "%", ""]}
           />
           <Area
             type="monotone"
             dataKey="produtividade"
-            name="Produtividade"
+            name="Operacional"
             stroke="hsl(160, 84%, 39%)"
             fillOpacity={1}
             fill="url(#colorProd)"
@@ -81,7 +148,7 @@ export function KPIChart() {
           <Area
             type="monotone"
             dataKey="eficiencia"
-            name="Eficiência"
+            name="Geral"
             stroke="hsl(38, 92%, 50%)"
             fillOpacity={1}
             fill="url(#colorEfic)"

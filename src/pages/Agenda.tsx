@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { CalendarDays, ChevronLeft, ChevronRight, Plus, Trash2, Clock, Loader2, CheckCircle2 } from "lucide-react";
@@ -50,6 +50,11 @@ export default function Agenda() {
   const [eventDescription, setEventDescription] = useState("");
   const [eventTime, setEventTime] = useState("");
   const [saving, setSaving] = useState(false);
+
+  // Reminder states
+  const [reminderEvent, setReminderEvent] = useState<AgendaEvent | null>(null);
+  const [reminderOpen, setReminderOpen] = useState(false);
+  const remindedEventsRef = useRef<Set<string>>(new Set());
 
 
 
@@ -211,6 +216,41 @@ export default function Agenda() {
       });
     }
   }, [events, profile?.name]);
+
+  // Interval check for exact time reminders (Popup)
+  useEffect(() => {
+    const checkReminders = () => {
+      // Don't trigger reminders while user is adding an event (avoids focus trap/black screen issues)
+      if (modalOpen) return;
+
+      const now = new Date();
+      // const currentHash = `${format(now, "yyyy-MM-dd")}T${format(now, "HH:mm")}`;
+
+      events.forEach(event => {
+        if (!event.event_time || event.completed || remindedEventsRef.current.has(event.id)) return;
+
+        const eventDateStr = event.event_date;
+        const eventTimeStr = event.event_time.slice(0, 5); // HH:mm
+
+        const isSameDate = eventDateStr === format(now, "yyyy-MM-dd");
+        if (isSameDate && eventTimeStr === format(now, "HH:mm")) {
+          setReminderEvent(event);
+          setReminderOpen(true);
+          remindedEventsRef.current.add(event.id);
+
+          // Optional: Play sound? Not requested but good UX.
+        }
+      });
+    };
+
+    // Check every 10 seconds
+    const interval = setInterval(checkReminders, 10000);
+
+    // Initial check
+    checkReminders();
+
+    return () => clearInterval(interval);
+  }, [events, modalOpen]);
 
   const dayEvents = selectedDate ? getEventsForDay(selectedDate) : [];
 
@@ -469,6 +509,45 @@ export default function Agenda() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+
+
+      {/* Reminder Modal */}
+      <Dialog open={reminderOpen} onOpenChange={setReminderOpen}>
+        <DialogContent className="max-w-md bg-card border-l-4 border-l-primary">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-xl text-primary">
+              <Clock className="h-6 w-6" />
+              Lembrete de Evento
+            </DialogTitle>
+            <DialogDescription className="text-base pt-2">
+              Você tem um evento agendado para agora.
+            </DialogDescription>
+          </DialogHeader>
+
+          {reminderEvent && (
+            <div className="py-4 space-y-3">
+              <div className="bg-secondary/30 p-4 rounded-lg border border-border/50">
+                <h3 className="font-semibold text-lg">{reminderEvent.title}</h3>
+                <div className="flex items-center gap-2 text-muted-foreground mt-1">
+                  <Clock className="h-4 w-4" />
+                  <span>{reminderEvent.event_time?.slice(0, 5)}</span>
+                </div>
+                {reminderEvent.description && (
+                  <p className="mt-2 text-sm text-foreground/80 italic">
+                    {reminderEvent.description}
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button className="w-full sm:w-auto" onClick={() => setReminderOpen(false)}>
+              Entendido
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div >
   );
 }

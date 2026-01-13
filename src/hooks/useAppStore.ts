@@ -152,7 +152,12 @@ const notifyListeners = () => {
 };
 
 // Global fetching for notifications
+let isFetchingNotifications = false;
+
 const fetchNotifications = async () => {
+  if (isFetchingNotifications) return;
+  isFetchingNotifications = true;
+
   try {
     const { data, error } = await supabase
       .from("notifications")
@@ -175,6 +180,8 @@ const fetchNotifications = async () => {
     notifyListeners();
   } catch (err) {
     console.error("Error fetching notifications:", err);
+  } finally {
+    isFetchingNotifications = false;
   }
 };
 

@@ -4,6 +4,8 @@ import { RecentActivity } from "@/components/dashboard/RecentActivity";
 import { OKRProgress } from "@/components/dashboard/OKRProgress";
 import { KPIChart } from "@/components/dashboard/KPIChart";
 import { useAppStore } from "@/hooks/useAppStore";
+import { useOKRs } from "@/hooks/useOKRs";
+import { useKPIs } from "@/hooks/useKPIs";
 import {
   GraduationCap,
   Target,
@@ -14,14 +16,16 @@ import {
 } from "lucide-react";
 
 export default function Dashboard() {
-  const { trainings, kpis, okrs } = useAppStore();
+  const { trainings } = useAppStore();
+  const { kpis } = useKPIs();
+  const { okrs } = useOKRs();
 
   const activeTrainings = trainings.filter((t) => t.status === "active").length;
   const onTrackKPIs = kpis.filter((k) => k.status === "on-track").length;
   const totalKeyResults = okrs.reduce((acc, okr) => acc + okr.keyResults.length, 0);
-  
+
   // Calculate overall efficiency
-  const avgKPIProgress = kpis.length > 0 
+  const avgKPIProgress = kpis.length > 0
     ? Math.round(kpis.reduce((acc, k) => acc + (k.current / k.target) * 100, 0) / kpis.length)
     : 0;
 
@@ -105,7 +109,7 @@ export default function Dashboard() {
 
       {/* Bottom Grid */}
       <div className="grid gap-6 lg:grid-cols-2">
-        <OKRProgress />
+        <OKRProgress okrs={okrs} />
         <RecentActivity />
       </div>
     </div>
