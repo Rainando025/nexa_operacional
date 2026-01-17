@@ -36,80 +36,6 @@ import { Process, useAppStore } from "@/hooks/useAppStore";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 
-const initialProcesses: Process[] = [
-  {
-    id: "PRC-001",
-    name: "Processo de Compras",
-    department: "Suprimentos",
-    owner: "Carlos Mendes",
-    version: "2.3",
-    status: "active",
-    lastReview: "10/01/2024",
-    nextReview: "10/07/2024",
-    risk: "low",
-    description: "Processo padrão para requisição e aprovação de compras",
-    content: "1. Solicitante preenche requisição\n2. Gestor aprova\n3. Compras realiza cotação\n4. Aprovação final\n5. Emissão de PO",
-  },
-  {
-    id: "PRC-002",
-    name: "Onboarding de Colaboradores",
-    department: "RH",
-    owner: "Ana Costa",
-    version: "1.8",
-    status: "active",
-    lastReview: "05/12/2023",
-    nextReview: "05/06/2024",
-    risk: "medium",
-    description: "Processo de integração de novos colaboradores",
-    content: "1. Documentação admissional\n2. Treinamento inicial\n3. Apresentação à equipe\n4. Acesso aos sistemas\n5. Acompanhamento 30/60/90 dias",
-  },
-  {
-    id: "PRC-003",
-    name: "Controle de Qualidade",
-    department: "Qualidade",
-    owner: "Roberto Lima",
-    version: "4.1",
-    status: "active",
-    lastReview: "20/01/2024",
-    nextReview: "20/07/2024",
-    risk: "low",
-  },
-  {
-    id: "PRC-004",
-    name: "Gestão de Incidentes",
-    department: "TI",
-    owner: "Paula Santos",
-    version: "3.0",
-    status: "review",
-    lastReview: "01/10/2023",
-    nextReview: "01/02/2024",
-    risk: "high",
-    description: "Procedimento para tratamento de incidentes de TI",
-    content: "1. Registro do incidente\n2. Classificação de severidade\n3. Análise e diagnóstico\n4. Resolução\n5. Documentação e fechamento",
-  },
-  {
-    id: "PRC-005",
-    name: "Faturamento e Cobrança",
-    department: "Financeiro",
-    owner: "Marcos Silva",
-    version: "2.5",
-    status: "active",
-    lastReview: "15/01/2024",
-    nextReview: "15/07/2024",
-    risk: "low",
-  },
-  {
-    id: "PRC-006",
-    name: "Atendimento ao Cliente",
-    department: "SAC",
-    owner: "Juliana Pereira",
-    version: "1.2",
-    status: "draft",
-    lastReview: "-",
-    nextReview: "28/02/2024",
-    risk: "medium",
-  },
-];
 
 const statusConfig = {
   active: { label: "Ativo", color: "bg-success/10 text-success", icon: CheckCircle2 },
@@ -125,8 +51,7 @@ const riskConfig = {
 
 export default function Processos() {
   const { profile, isAdmin, isManager } = useAuth();
-  const { addNotification } = useAppStore();
-  const [processes, setProcesses] = useState<Process[]>(initialProcesses);
+  const { processes, addProcess, updateProcess, deleteProcess, addNotification } = useAppStore();
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [modalOpen, setModalOpen] = useState(false);
@@ -191,7 +116,7 @@ export default function Processos() {
 
   const handleDelete = (id: string) => {
     const process = processes.find(p => p.id === id);
-    setProcesses((prev) => prev.filter((p) => p.id !== id));
+    deleteProcess(id);
     toast({ title: "Processo excluído com sucesso" });
     addNotification({
       userName: profile?.name || "Usuário",
@@ -203,9 +128,7 @@ export default function Processos() {
 
   const handleSave = (data: Omit<Process, "id" | "lastReview">) => {
     if (selectedProcess) {
-      setProcesses((prev) =>
-        prev.map((p) => (p.id === selectedProcess.id ? { ...p, ...data } : p))
-      );
+      updateProcess(selectedProcess.id, data);
       toast({ title: "Processo atualizado com sucesso" });
       addNotification({
         userName: profile?.name || "Usuário",
@@ -214,19 +137,13 @@ export default function Processos() {
         details: `Atualizou o processo: "${data.name}"`,
       });
     } else {
-      const newId = `PRC-${String(processes.length + 1).padStart(3, "0")}`;
-      const newProcess: Process = {
-        ...data,
-        id: newId,
-        lastReview: "-",
-      };
-      setProcesses((prev) => [...prev, newProcess]);
+      addProcess(data);
       toast({ title: "Processo criado com sucesso" });
       addNotification({
         userName: profile?.name || "Usuário",
         action: "CRIOU",
         resource: "Processo",
-        details: `Criou um novo processo: "${data.name}" (ID: ${newId})`,
+        details: `Criou um novo processo: "${data.name}"`,
       });
     }
   };

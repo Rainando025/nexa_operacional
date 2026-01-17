@@ -76,7 +76,6 @@ const statusConfig = {
   "off-track": { label: "Fora da meta", color: "bg-destructive/10 text-destructive" },
 };
 
-const categories = ["Todos", "Operacional", "Qualidade", "Financeiro", "RH", "Logística", "Atendimento", "Manutenção"];
 
 export default function KPIs() {
   const { profile, isAdmin } = useAuth();
@@ -84,6 +83,7 @@ export default function KPIs() {
   const [kpis, setKpis] = useState<KPI[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState("Todos");
+  const [departments, setDepartments] = useState<string[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingKPI, setEditingKPI] = useState<KPI | undefined>();
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -104,6 +104,12 @@ export default function KPIs() {
   const fetchKPIs = async () => {
     setLoading(true);
     try {
+      // Fetch departments first to have categories
+      const { data: deptsData } = await supabase.from("departments").select("name").order("name");
+      if (deptsData) {
+        setDepartments(["Todos", ...deptsData.map(d => d.name)]);
+      }
+
       // Admins veem todos os KPIs, outros usuários veem apenas do seu departamento
       let query = supabase.from("kpis").select("*");
 
@@ -425,7 +431,7 @@ export default function KPIs() {
                   <SelectValue placeholder="Categoria" />
                 </SelectTrigger>
                 <SelectContent>
-                  {categories.map((cat) => (
+                  {departments.map((cat) => (
                     <SelectItem key={cat} value={cat}>
                       {cat}
                     </SelectItem>

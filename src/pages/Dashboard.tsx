@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 
 export default function Dashboard() {
-  const { trainings } = useAppStore();
+  const { trainings, processes } = useAppStore();
   const { kpis } = useKPIs();
   const { okrs } = useOKRs();
 
@@ -73,8 +73,8 @@ export default function Dashboard() {
         />
         <StatCard
           title="Processos Mapeados"
-          value={156}
-          change="+8 novos"
+          value={processes.length}
+          change={`${processes.filter(p => p.status === 'active').length} ativos`}
           changeType="positive"
           icon={GitBranch}
           delay={300}

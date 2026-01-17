@@ -9,7 +9,7 @@ CREATE TABLE public.departments (
 );
 
 -- Create sectors table
-CREATE TABLE public.sectors (
+CREATE TABLE public.sectors (w
   id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
   name TEXT NOT NULL,
   department_id UUID REFERENCES public.departments(id) ON DELETE CASCADE NOT NULL,

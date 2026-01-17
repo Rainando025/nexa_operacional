@@ -27,6 +27,7 @@ import {
 } from "@/components/ui/select";
 import { toast } from "@/hooks/use-toast";
 import { KPI } from "@/hooks/useAppStore";
+import { supabase } from "@/integrations/supabase/client";
 
 const kpiSchema = z.object({
   name: z.string().min(3, "Nome deve ter no mínimo 3 caracteres"),
@@ -38,15 +39,6 @@ const kpiSchema = z.object({
 
 type KPIFormData = z.infer<typeof kpiSchema>;
 
-const categories = [
-  "Operacional",
-  "Qualidade",
-  "Financeiro",
-  "RH",
-  "Logística",
-  "Atendimento",
-  "Manutenção",
-];
 
 interface KPIModalProps {
   open: boolean;
@@ -62,6 +54,7 @@ export function KPIModal({
   initialData,
 }: KPIModalProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [departments, setDepartments] = useState<string[]>([]);
 
   const form = useForm<KPIFormData>({
     resolver: zodResolver(kpiSchema),
@@ -73,6 +66,16 @@ export function KPIModal({
       unit: "%",
     },
   });
+
+  useEffect(() => {
+    const fetchDepartments = async () => {
+      const { data } = await supabase.from("departments").select("name").order("name");
+      if (data) {
+        setDepartments(data.map(d => d.name));
+      }
+    };
+    fetchDepartments();
+  }, []);
 
   useEffect(() => {
     if (open) {
@@ -94,7 +97,7 @@ export function KPIModal({
         });
       }
     }
-  }, [open, initialData, form]);
+  }, [open, initialData, form.reset]);
 
 
   const calculateStatus = (current: number, target: number): KPI["status"] => {
@@ -171,7 +174,7 @@ export function KPIModal({
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {categories.map((cat) => (
+                      {departments.map((cat) => (
                         <SelectItem key={cat} value={cat}>
                           {cat}
                         </SelectItem>

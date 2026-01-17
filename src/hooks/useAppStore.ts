@@ -140,6 +140,80 @@ const saveToStorage = (key: string, value: any) => {
 let trainings = loadFromStorage("trainings", initialTrainings);
 let kpis = loadFromStorage("kpis", initialKPIs);
 let okrs = loadFromStorage("okrs", []);
+let processes = loadFromStorage("processes", [
+  {
+    id: "PRC-001",
+    name: "Processo de Compras",
+    department: "Suprimentos",
+    owner: "Carlos Mendes",
+    version: "2.3",
+    status: "active",
+    lastReview: "10/01/2024",
+    nextReview: "10/07/2024",
+    risk: "low",
+    description: "Processo padrão para requisição e aprovação de compras",
+    content: "1. Solicitante preenche requisição\n2. Gestor aprova\n3. Compras realiza cotação\n4. Aprovação final\n5. Emissão de PO",
+  },
+  {
+    id: "PRC-002",
+    name: "Onboarding de Colaboradores",
+    department: "RH",
+    owner: "Ana Costa",
+    version: "1.8",
+    status: "active",
+    lastReview: "05/12/2023",
+    nextReview: "05/06/2024",
+    risk: "medium",
+    description: "Processo de integração de novos colaboradores",
+    content: "1. Documentação admissional\n2. Treinamento inicial\n3. Apresentação à equipe\n4. Acesso aos sistemas\n5. Acompanhamento 30/60/90 dias",
+  },
+  {
+    id: "PRC-003",
+    name: "Controle de Qualidade",
+    department: "Qualidade",
+    owner: "Roberto Lima",
+    version: "4.1",
+    status: "active",
+    lastReview: "20/01/2024",
+    nextReview: "20/07/2024",
+    risk: "low",
+  },
+  {
+    id: "PRC-004",
+    name: "Gestão de Incidentes",
+    department: "TI",
+    owner: "Paula Santos",
+    version: "3.0",
+    status: "review",
+    lastReview: "01/10/2023",
+    nextReview: "01/02/2024",
+    risk: "high",
+    description: "Procedimento para tratamento de incidentes de TI",
+    content: "1. Registro do incidente\n2. Classificação de severidade\n3. Análise e diagnóstico\n4. Resolução\n5. Documentação e fechamento",
+  },
+  {
+    id: "PRC-005",
+    name: "Faturamento e Cobrança",
+    department: "Financeiro",
+    owner: "Marcos Silva",
+    version: "2.5",
+    status: "active",
+    lastReview: "15/01/2024",
+    nextReview: "15/07/2024",
+    risk: "low",
+  },
+  {
+    id: "PRC-006",
+    name: "Atendimento ao Cliente",
+    department: "SAC",
+    owner: "Juliana Pereira",
+    version: "1.2",
+    status: "draft",
+    lastReview: "-",
+    nextReview: "28/02/2024",
+    risk: "medium",
+  },
+]);
 let notifications: ActionNotification[] = [];
 
 let listeners: (() => void)[] = [];
@@ -148,6 +222,7 @@ const notifyListeners = () => {
   saveToStorage("trainings", trainings);
   saveToStorage("kpis", kpis);
   saveToStorage("okrs", okrs);
+  saveToStorage("processes", processes);
   listeners.forEach((l) => l());
 };
 
@@ -289,6 +364,26 @@ export function useAppStore() {
     notifyListeners();
   }, []);
 
+  const addProcess = useCallback((process: Omit<Process, "id" | "lastReview">) => {
+    const newId = `PRC-${String(processes.length + 1).padStart(3, "0")}`;
+    const newProcess: Process = {
+      ...process,
+      id: newId,
+      lastReview: "-",
+    };
+    processes = [...processes, newProcess];
+    notifyListeners();
+  }, []);
+
+  const updateProcess = useCallback((id: string, updates: Partial<Process>) => {
+    processes = processes.map((p) => (p.id === id ? { ...p, ...updates } : p));
+    notifyListeners();
+  }, []);
+
+  const deleteProcess = useCallback((id: string) => {
+    processes = processes.filter((p) => p.id !== id);
+    notifyListeners();
+  }, []);
   const addNotification = useCallback(async (notification: Omit<ActionNotification, "id" | "timestamp" | "read_by_admins"> & { userName?: string }) => {
     try {
       const dbUserName = (notification as any).userName || notification.user_name || "Usuário";
@@ -327,6 +422,7 @@ export function useAppStore() {
     trainings,
     kpis,
     okrs,
+    processes,
     addTraining: (t: any) => { trainings = [...trainings, { ...t, id: Date.now().toString() }]; notifyListeners(); },
     updateTraining: (id: string, u: any) => { trainings = trainings.map(t => t.id === id ? { ...t, ...u } : t); notifyListeners(); },
     deleteTraining: (id: string) => { trainings = trainings.filter(t => t.id !== id); notifyListeners(); },
@@ -337,6 +433,9 @@ export function useAppStore() {
     addOKR,
     updateOKR,
     deleteOKR,
+    addProcess,
+    updateProcess,
+    deleteProcess,
     notifications: notifications.map((n) => ({
       ...n,
       userName: (n as any).user_name || (n as any).userName || "Usuário",
